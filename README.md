@@ -160,3 +160,33 @@ Human: 你要检查两个句子是否说的是同一件事。
 
 Assistant:[ "
 ```
+
+#### 故事重写
+```
+"
+Human:  我希望你按照以下说明重写以下段落："以惊心动魄的冒险风格"。
+
+"《牛郎织女》讲的是天帝的孙女织女厌倦天宫而下凡，嫁给牛郎，过起男耕女织的日子 "
+
+请将您的重写放在 <rewrite></rewrite> 标签中。
+
+Assistant: <rewrite>
+
+```
+
+### Function Calling
+```
+<tool_description>
+<tool_name>get_address_from_location</tool_name>
+<description>
+获取自然语言位置的地址。 返回地址（str）：指定位置的地址。 Raises ValueError: if the input location string is invalid and can't be found.
+<parameters>
+<parameter>
+<name>location_string</name>
+<type>string</type>
+<description>必填参数。 以自然语言指定的位置，例如“东方明珠”
+</description>
+</parameter>
+</parameters>
+</tool_description>
+```
