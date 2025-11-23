@@ -1,8 +1,18 @@
 # Claude 中文调教指南
 
+## 项目结构
+
+本项目包含两个主要目录：
+
+- **`prompts/`** - 存放 Claude 提示词、参考资料和相关资源
+  - `assets/` - 图片和媒体文件
+  - `reference/` - 参考文档
+
+- **`skills/`** - 存放 Claude Code 的自定义 Skills
+  - 可在此创建和分享可重用的技能模块
 
 ## Claude 是什么
-![](./assets/meetclaude.jpg)
+![](./prompts/assets/meetclaude.jpg)
 Claude 是一个由Anthropic开发的人工智能聊天机器人，它可以进行自然对话，并提供友善、诚实的回答。Claude目前可以通过API和一个网站免费公开使用，在官网能为美国和英国的IP提供直接访问。
 
 ## Cluade 版本
