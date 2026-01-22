@@ -13,11 +13,14 @@
 
 ## Claude 是什么
 ![](./prompts/assets/meetclaude.jpg)
-Claude 是一个由Anthropic开发的人工智能聊天机器人，它可以进行自然对话，并提供友善、诚实的回答。Claude目前可以通过API和一个网站免费公开使用，在官网能为美国和英国的IP提供直接访问。
+Claude 是一个由 Anthropic 开发的人工智能聊天机器人，它可以进行自然对话，并提供友善、诚实的回答。Claude 目前可以通过 API 和官方网站使用，部分功能在特定地区（如美国和英国）可直接访问。
 
-## Cluade 版本
-* Claude v2.0 & v2.1
-* Claude v1
+## Claude 版本
+* **Claude Sonnet 4.5** (2025) - 最新旗舰模型
+* **Claude 3.5 Sonnet** - 平衡性能与速度
+* **Claude 3** (Opus, Sonnet, Haiku) - 多规格模型系列
+* **Claude 2** (v2.0 & v2.1) - 经典版本
+* **Claude 1** - 初代版本
 
 
 ## Claude2 特点
@@ -30,7 +33,7 @@ Claude 是一个由Anthropic开发的人工智能聊天机器人，它可以进�
 ## Claude 提示词注意事项
 通过 API 发送的提示必须包含 \n\nHuman: 和 \n\nAssistant: 作为说话人的信号。 如果你使用 Web 界面中，自动添加这些内容。
 
-举个列子
+举个例子
 * Claude 官网web页面
 你可以直接输入 “为什么地球是圆的？”
 * API调用
@@ -203,18 +206,26 @@ Assistant: <rewrite>
 ```
 
 ### Function Calling
-```
+
+Function Calling 允许 Claude 调用外部工具和 API。以下是一个完整的示例：
+
+**1. 工具定义**
+```xml
 <tool_description>
 <tool_name>get_address_from_location</tool_name>
 <description>
-获取自然语言位置的地址。 返回地址（str）：指定位置的地址。 Raises ValueError: if the input location string is invalid and can't be found.
+获取自然语言位置的地址。返回地址（str）：指定位置的地址。Raises ValueError: if the input location string is invalid and can't be found.
+</description>
 <parameters>
 <parameter>
 <name>location_string</name>
 <type>string</type>
-<description>必填参数。 以自然语言指定的位置，例如“东方明珠”
-</description>
+<description>必填参数。以自然语言指定的位置，例如"东方明珠"</description>
 </parameter>
 </parameters>
 </tool_description>
 ```
+
+**2. 使用示例**
+```
+Human: 帮我查一下东方明珠的地址
