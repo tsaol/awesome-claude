@@ -99,7 +99,7 @@ def test_url(
                     results["errors"] = console_errors[:10]
                     print(f"⚠️  Console errors found: {len(console_errors)}")
                     for err in console_errors[:5]:
-                        print(f"   - {err[:100]}...")
+                        print(f"   - {err[:100]}{'...' if len(err) > 100 else ''}")
 
                 # Check API if requested
                 if check_api:
