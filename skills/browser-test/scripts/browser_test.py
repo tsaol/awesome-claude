@@ -26,14 +26,14 @@ def ensure_dependencies():
 
 ensure_dependencies()
 
-from bedrock_agentcore.tools.browser_client import BrowserClient
-from playwright.async_api import async_playwright
+from bedrock_agentcore.tools.browser_client import browser_session
+from playwright.sync_api import sync_playwright
 import nest_asyncio
 
 nest_asyncio.apply()
 
 
-async def test_url(
+def test_url(
     url: str,
     screenshot_path: str = None,
     check_api: bool = False,
@@ -62,93 +62,77 @@ async def test_url(
 
     print(f"🚀 Starting browser session in {region}...")
 
-    client = BrowserClient(region=region)
-    session_id = None
-
     try:
-        # Start browser session
-        session = await client.start_browser_session(
-            session_name=f"test-{url.replace('https://', '').replace('http://', '').replace('/', '-')[:30]}",
-            timeout=300,
-            viewport={"width": 1920, "height": 1080}
-        )
+        with browser_session(region) as client:
+            print(f"✅ Browser session started")
 
-        session_id = session.get("sessionId", "unknown")
-        print(f"✅ Browser session started: {session_id}")
+            # Get WebSocket URL and headers
+            ws_url, headers = client.generate_ws_headers()
 
-        # Get WebSocket URL and headers
-        ws_url, headers = await client.generate_ws_headers()
+            # Connect with Playwright
+            with sync_playwright() as p:
+                print("🔗 Connecting to remote browser...")
+                browser = p.chromium.connect_over_cdp(ws_url, headers=headers)
 
-        # Connect with Playwright
-        async with async_playwright() as p:
-            print("🔗 Connecting to remote browser...")
-            browser = await p.chromium.connect_over_cdp(ws_url, headers=headers)
+                context = browser.contexts[0]
+                page = context.pages[0] if context.pages else context.new_page()
 
-            context = browser.contexts[0]
-            page = context.pages[0] if context.pages else await context.new_page()
+                # Capture console errors
+                console_errors = []
+                page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
 
-            # Capture console errors
-            console_errors = []
-            page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+                # Navigate to URL
+                print(f"🌐 Navigating to {url}...")
+                response = page.goto(url, wait_until="networkidle", timeout=60000)
 
-            # Navigate to URL
-            print(f"🌐 Navigating to {url}...")
-            response = await page.goto(url, wait_until="networkidle", timeout=60000)
+                results["status"] = response.status if response else "no_response"
+                results["title"] = page.title()
 
-            results["status"] = response.status if response else "no_response"
-            results["title"] = await page.title()
+                print(f"📄 Page title: {results['title']}")
+                print(f"📊 HTTP status: {results['status']}")
 
-            print(f"📄 Page title: {results['title']}")
-            print(f"📊 HTTP status: {results['status']}")
+                # Wait for any async errors
+                page.wait_for_timeout(2000)
 
-            # Wait for any async errors
-            await asyncio.sleep(2)
+                # Check for console errors
+                if console_errors:
+                    results["errors"] = console_errors[:10]
+                    print(f"⚠️  Console errors found: {len(console_errors)}")
+                    for err in console_errors[:5]:
+                        print(f"   - {err[:100]}...")
 
-            # Check for console errors
-            if console_errors:
-                results["errors"] = console_errors[:10]
-                print(f"⚠️  Console errors found: {len(console_errors)}")
-                for err in console_errors[:5]:
-                    print(f"   - {err[:100]}...")
+                # Check API if requested
+                if check_api:
+                    api_url = url.rstrip("/") + "/api/health"
+                    print(f"🔍 Checking API: {api_url}")
+                    try:
+                        api_response = page.goto(api_url, timeout=10000)
+                        api_text = page.content()
+                        results["api_check"] = {
+                            "url": api_url,
+                            "status": api_response.status if api_response else "no_response",
+                            "body": api_text[:500] if api_text else None
+                        }
+                        print(f"   API status: {results['api_check']['status']}")
+                    except Exception as e:
+                        results["api_check"] = {"url": api_url, "error": str(e)}
+                        print(f"   API error: {e}")
 
-            # Check API if requested
-            if check_api:
-                api_url = url.rstrip("/") + "/api/health"
-                print(f"🔍 Checking API: {api_url}")
-                try:
-                    api_response = await page.goto(api_url, timeout=10000)
-                    api_text = await page.content()
-                    results["api_check"] = {
-                        "url": api_url,
-                        "status": api_response.status if api_response else "no_response",
-                        "body": api_text[:500] if api_text else None
-                    }
-                    print(f"   API status: {results['api_check']['status']}")
-                except Exception as e:
-                    results["api_check"] = {"url": api_url, "error": str(e)}
-                    print(f"   API error: {e}")
+                # Take screenshot if requested
+                if screenshot_path:
+                    # Navigate back to main page for screenshot
+                    page.goto(url, wait_until="networkidle", timeout=60000)
+                    page.screenshot(path=screenshot_path, full_page=True)
+                    results["screenshot"] = screenshot_path
+                    print(f"📸 Screenshot saved: {screenshot_path}")
 
-            # Take screenshot if requested
-            if screenshot_path:
-                # Navigate back to main page for screenshot
-                await page.goto(url, wait_until="networkidle", timeout=60000)
-                await page.screenshot(path=screenshot_path, full_page=True)
-                results["screenshot"] = screenshot_path
-                print(f"📸 Screenshot saved: {screenshot_path}")
+                browser.close()
 
-            await browser.close()
+            print("🧹 Session cleaned up")
 
     except Exception as e:
         results["errors"].append(str(e))
         print(f"❌ Error: {e}")
-
-    finally:
-        # Cleanup session
-        try:
-            await client.stop_browser_session()
-            print("🧹 Session cleaned up")
-        except Exception:
-            pass
 
     return results
 
@@ -173,12 +157,12 @@ Examples:
     args = parser.parse_args()
 
     # Run the test
-    results = asyncio.run(test_url(
+    results = test_url(
         url=args.url,
         screenshot_path=args.screenshot,
         check_api=args.check_api,
         region=args.region
-    ))
+    )
 
     # Output results
     if args.json:
