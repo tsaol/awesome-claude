@@ -72,14 +72,14 @@ python scripts/browser_test.py https://example.com -s screenshot.png -a --json
 ### Simple Test
 
 ```python
-import asyncio
 from browser_test import test_url
 
-results = asyncio.run(test_url(
+# test_url is a synchronous function
+results = test_url(
     url="https://example.com",
     screenshot_path="screenshot.png",
     check_api=True
-))
+)
 
 print(f"Status: {results['status']}")
 print(f"Title: {results['title']}")
