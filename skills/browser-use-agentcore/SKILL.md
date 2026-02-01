@@ -1,10 +1,19 @@
 ---
-name: browser-test
-description: AWS AgentCore Browser testing skill for automated web testing, screenshot capture, and API health checks. Use this skill when you need to test websites, verify page loading, check for console errors, or capture screenshots using a cloud-based browser.
+name: browser-use-agentcore
+description: >
+  AWS AgentCore Browser skill for automated web testing and screenshot capture.
+  Use this skill when the user asks to:
+  - Test if a website works / 测试网站是否正常
+  - Take a screenshot of a webpage / 截取网页截图
+  - Check for JavaScript errors or console errors
+  - Verify API health endpoints
+  - Open a URL in a cloud browser
+  - Debug website loading issues
+  This skill uses AWS Bedrock AgentCore Browser (cloud-based, no local browser needed).
 license: MIT
 ---
 
-# Browser Test Skill
+# Browser Use AgentCore Skill
 
 ## Overview
 
