@@ -137,23 +137,43 @@ Code Changes Complete
 
 After fixing all issues, automatically commit and push:
 
-1. **Stage changes**: `git add` modified docs
-2. **Commit**: Use descriptive message based on changes
+1. **Stage changes**: `git add` modified files
+2. **Commit**: Summarize code changes in simple, human-like message
 3. **Push**: Push to remote branch
 4. **Create PR**: If on feature branch, create PR with reviewer
 
+### Commit Message Style
+
+**ALWAYS use simple, human-like commit messages:**
+
+- Keep messages short and natural
+- Summarize what the code changes actually do
+- Use casual, everyday language
+- Avoid formal conventions like "feat:", "chore:", "refactor:", etc.
+- Write like a human developer would in daily work
+- **Never include any Claude-related attribution**:
+  - No "Generated with Claude Code"
+  - No "Co-Authored-By: Claude"
+
+**Good examples:**
+- `add user login`
+- `fix slow queries`
+- `update packages`
+- `add image download to browser fetcher`
+- `store s3 paths in opensearch`
+
+**Bad examples:**
+- `feat: implement comprehensive user authentication system with JWT token validation`
+- `chore: update dependencies to latest versions`
+- `docs: update CHANGELOG for feature xyz`
+
 ```bash
 # Example commit flow
-git add CHANGELOG.md DESIGN.md README.md
-git commit -m "docs: update documentation for recent changes"
+git add .
+git commit -m "add browser fetcher with screenshot support"
 git push origin <branch>
 gh pr create --reviewer tsaol  # if on feature branch
 ```
-
-**Commit message format**:
-- `docs: update CHANGELOG for {feature}`
-- `docs: sync README with current implementation`
-- `docs: update DESIGN.md schema`
 
 ## Usage
 
@@ -180,5 +200,5 @@ gh pr create --reviewer tsaol  # if on feature branch
 
 ### Recommendations
 1. Add entry to CHANGELOG.md:
-   - "fix: save url/source/category in sent_news.json"
+   - "save url/source/category in sent_news.json"
 ```
