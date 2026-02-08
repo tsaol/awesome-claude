@@ -1,9 +1,9 @@
 ---
-name: git-check
-description: Review project consistency after code changes. Checks if code, design docs, CHANGELOG, and README are aligned. Use after finishing code modifications and before committing.
+name: git-commit
+description: Review project consistency and commit changes. Checks code vs docs alignment, updates CHANGELOG/README/DESIGN.md, updates ~/history.log, then commits and pushes. Use after finishing code modifications.
 ---
 
-# Git Check - Project Consistency Review
+# Git Commit - Review, Fix & Commit
 
 ## Overview
 
@@ -16,7 +16,7 @@ This skill reviews project consistency after code changes to ensure:
 
 ## When to Use
 
-Trigger `/git-check` after:
+Trigger `/git-commit` after:
 - Completing a feature implementation
 - Fixing a bug
 - Before creating a PR
@@ -119,7 +119,7 @@ Generate a report:
 ```
 Code Changes Complete
         ↓
-    /git-check
+    /git-commit
         ↓
 ┌─────────────────────────┐
 │ 1. Read changed files   │
@@ -158,9 +158,9 @@ gh pr create --reviewer tsaol  # if on feature branch
 ## Usage
 
 ```
-/git-check              # Full consistency review
-/git-check --quick      # Quick check (CHANGELOG + README only)
-/git-check --verbose    # Detailed report with suggestions
+/git-commit              # Full consistency review
+/git-commit --quick      # Quick check (CHANGELOG + README only)
+/git-commit --verbose    # Detailed report with suggestions
 ```
 
 ## Example Output
