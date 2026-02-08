@@ -128,12 +128,32 @@ Code Changes Complete
 │ 4. Compare with docs    │
 │ 5. Update ~/history.log │
 │ 6. Generate report      │
+│ 7. Fix issues (if any)  │
+│ 8. Git commit & push    │
 └─────────────────────────┘
-        ↓
-    Fix Issues (if any)
-        ↓
-    git commit
 ```
+
+## Auto Commit
+
+After fixing all issues, automatically commit and push:
+
+1. **Stage changes**: `git add` modified docs
+2. **Commit**: Use descriptive message based on changes
+3. **Push**: Push to remote branch
+4. **Create PR**: If on feature branch, create PR with reviewer
+
+```bash
+# Example commit flow
+git add CHANGELOG.md DESIGN.md README.md
+git commit -m "docs: update documentation for recent changes"
+git push origin <branch>
+gh pr create --reviewer tsaol  # if on feature branch
+```
+
+**Commit message format**:
+- `docs: update CHANGELOG for {feature}`
+- `docs: sync README with current implementation`
+- `docs: update DESIGN.md schema`
 
 ## Usage
 
