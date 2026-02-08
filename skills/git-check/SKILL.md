@@ -12,6 +12,7 @@ This skill reviews project consistency after code changes to ensure:
 - CHANGELOG is updated for new features/fixes
 - README reflects current functionality
 - No outdated documentation
+- ~/history.log is updated with session summary (if exists)
 
 ## When to Use
 
@@ -62,7 +63,33 @@ Ensure README.md reflects:
 cat README.md
 ```
 
-### 4. Consistency Report
+### 4. History Log Update
+
+Check if `~/history.log` exists and update it with session summary:
+
+```bash
+# Check if history.log exists
+if [ -f ~/history.log ]; then
+    echo "history.log exists, will update"
+fi
+```
+
+If exists, append a summary of changes made in this session:
+
+```markdown
+=== {DATE} {PROJECT_NAME} - {BRIEF_DESCRIPTION} ===
+
+## Changes
+- Feature/fix description
+- Files modified
+- PRs created
+
+## Key Commands
+- python hub/main.py search "query"
+- etc.
+```
+
+### 5. Consistency Report
 
 Generate a report:
 
@@ -76,6 +103,7 @@ Generate a report:
 - [ ] CHANGELOG updated: Yes/No
 - [ ] README accurate: Yes/No
 - [ ] Design docs aligned: Yes/No
+- [ ] ~/history.log updated: Yes/No/Not exists
 
 ### Issues Found
 - Issue 1: ...
@@ -93,13 +121,14 @@ Code Changes Complete
         ↓
     /git-check
         ↓
-┌───────────────────────┐
-│ 1. Read changed files │
-│ 2. Check CHANGELOG    │
-│ 3. Verify README      │
-│ 4. Compare with docs  │
-│ 5. Generate report    │
-└───────────────────────┘
+┌─────────────────────────┐
+│ 1. Read changed files   │
+│ 2. Check CHANGELOG      │
+│ 3. Verify README        │
+│ 4. Compare with docs    │
+│ 5. Update ~/history.log │
+│ 6. Generate report      │
+└─────────────────────────┘
         ↓
     Fix Issues (if any)
         ↓
