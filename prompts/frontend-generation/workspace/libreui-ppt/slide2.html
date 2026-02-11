@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #ffffff; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #f8fafc; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header { background: #0f172a; padding: 20pt 30pt; }
+.header h1 { color: #ffffff; font-size: 24pt; margin: 0; }
+.header p { color: #94a3b8; font-size: 11pt; margin: 4pt 0 0 0; }
+.content { flex: 1; display: flex; gap: 16pt; padding: 24pt 30pt; }
+.card { flex: 1; background: #ffffff; border-radius: 12pt; padding: 20pt; border-left: 4pt solid #3b82f6; }
+.card-icon { background: #eff6ff; width: 36pt; height: 36pt; border-radius: 8pt; margin-bottom: 12pt; display: flex; align-items: center; justify-content: center; }
+.card-icon p { color: #3b82f6; font-size: 18pt; margin: 0; }
+.card h2 { color: #1e293b; font-size: 14pt; margin: 0 0 8pt 0; }
+.card p { color: #64748b; font-size: 10pt; line-height: 1.4; margin: 0; }
+.footer { background: #0f172a; padding: 12pt 30pt; }
+.footer p { color: #64748b; font-size: 9pt; margin: 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>行业痛点与挑战</h1>
+  <p>企业在内容安全领域面临的核心问题</p>
+</div>
+<div class="content">
+  <div class="card">
+    <div class="card-icon"><p>!</p></div>
+    <h2>规模与速度</h2>
+    <p>日均百万级内容审核需求，传统人工方式无法满足实时性要求，审核延迟影响用户体验</p>
+  </div>
+  <div class="card">
+    <div class="card-icon"><p>?</p></div>
+    <h2>对抗性攻击</h2>
+    <p>不良行为者持续升级绕过手段：同音字、图片变体、多模态混淆，规则系统难以应对</p>
+  </div>
+  <div class="card">
+    <div class="card-icon"><p>$</p></div>
+    <h2>成本与精度</h2>
+    <p>大模型精度高但成本高昂，小模型快速但误判多，如何平衡成本与准确率是关键挑战</p>
+  </div>
+  <div class="card">
+    <div class="card-icon"><p>*</p></div>
+    <h2>多场景覆盖</h2>
+    <p>风控、营销、UGC 各有不同标准，缺乏统一的治理框架和可复用的技术能力</p>
+  </div>
+</div>
+<div class="footer"><p>02 / 08</p></div>
+</body>
+</html>
