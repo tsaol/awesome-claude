@@ -43,9 +43,9 @@ cat >> /home/ubuntu/.bashrc << 'EOF'
 # Claude CLI Configuration
 export PATH="$HOME/.local/bin:$PATH"
 export CLAUDE_CODE_USE_BEDROCK=1
-export AWS_REGION="us-west-2"
-export ANTHROPIC_MODEL="global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-export ANTHROPIC_SMALL_FAST_MODEL="us.anthropic.claude-3-5-haiku-20241022-v1:0"
+export AWS_REGION="ap-northeast-1"
+export ANTHROPIC_MODEL="global.anthropic.claude-opus-4-6-v1"
+export ANTHROPIC_SMALL_FAST_MODEL="global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS=8192
 export MAX_THINKING_TOKENS=4096
 EOF
