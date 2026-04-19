@@ -78,11 +78,16 @@ python scripts/docgen.py --type pptx \
   --prompt-file my-prompt.txt \
   --output slides.pptx
 
-# Custom timeout for complex documents
+# Large PPT (15+ slides) — auto-splits into parallel batches
 python scripts/docgen.py --type pptx \
-  --prompt-file complex-prompt.txt \
+  --prompt-file 22-slide-prompt.txt \
+  --output big-deck.pptx
+
+# Force single-batch mode (disable auto-split)
+python scripts/docgen.py --type pptx \
+  --prompt-file prompt.txt \
   --output output.pptx \
-  --timeout 1800
+  --no-split --timeout 1800
 ```
 
 ## Python API
@@ -204,7 +209,9 @@ ls -la output/presentation.pptx
 | `--output` | `-o` | Output file path (required) |
 | `--region` | | AWS region (default: ap-northeast-1) |
 | `--runtime-arn` | | AgentCore Runtime ARN |
-| `--timeout` | | Read timeout in seconds (default: 1200) |
+| `--timeout` | | Read timeout in seconds (auto-estimated if omitted) |
+| `--no-split` | | Disable auto-split for large PPTX |
+| `--max-slides-per-batch` | | Max slides per batch when splitting (default: 11) |
 
 ## Tips for Better Results
 
@@ -214,16 +221,24 @@ ls -la output/presentation.pptx
 4. **Chinese content**: Specify "All slide titles and content MUST be in Chinese" if needed
 5. **Data tables**: Describe as "table: col1, col2, col3" with row data
 6. **Complex prompts**: Save to a file with `--prompt-file` instead of inline `--prompt`
+7. **Respect the 20-call budget**: The server agent has a hard limit of 20 tool calls (code executions). Keep each slide description under 50 words so the agent can generate everything in 1-2 code runs
+8. **Auto-split threshold**: For 15+ slides, the script auto-splits into ≤11-slide batches. This is more reliable than generating 22 slides in one shot
 
 ## Troubleshooting
 
 ### Timeout Errors
 
-For complex documents (15+ slides, detailed content), the server may need more than 20 minutes:
+The script now auto-estimates timeout based on complexity. If you still hit timeouts:
 
 ```bash
-python scripts/docgen.py --type pptx --prompt-file prompt.txt --output out.pptx --timeout 1800
+# Explicit timeout override
+python scripts/docgen.py --type pptx --prompt-file prompt.txt --output out.pptx --timeout 2400
+
+# Better: let auto-split handle it (15+ slides splits into parallel batches)
+python scripts/docgen.py --type pptx --prompt-file prompt.txt --output out.pptx
 ```
+
+The script retries up to 3 times on transient errors (timeout, connection reset) with exponential backoff.
 
 ### RUNTIME_ARN Not Configured
 
@@ -243,12 +258,27 @@ RUNTIME_ARN=arn:aws:bedrock-agentcore:ap-northeast-1:123456789:runtime/your-agen
 
 ### Empty or Failed Response
 
-The AgentCore agent may fail silently on overly complex prompts. Try:
-- Reducing the number of slides (keep <= 16)
-- Simplifying per-slide content
-- Splitting into multiple smaller documents
+The AgentCore agent has a **20 tool call budget** (enforced by MaxToolCallsHook on the server). If the prompt is too complex, the agent runs out of calls before producing the file. Symptoms:
+- Response with no `file_base64`
+- Error: "Code Interpreter did not produce an output file"
+
+Solutions:
+- Reduce slide count (keep ≤ 11 per batch, the auto-split handles this)
+- Simplify per-slide content (use keywords, not paragraphs)
+- The agent must: install deps (1 call) + generate file (1 call) + output base64 (1 call) = 3 minimum calls, leaving 17 for error recovery
+
+### Understanding Server Constraints
+
+The remote agent operates under these constraints:
+- **Model**: Claude Opus 4.6 (cross-region inference profile)
+- **Tool call limit**: 20 code executions maximum (warning at 19, hard-stop at 21)
+- **Conversation window**: SlidingWindowConversationManager (window=20, per_turn=True) — old messages get trimmed
+- **Base64 capture**: A hook captures file output before conversation trimming
+- **Retry on server**: The agent retries transient Bedrock errors up to 3 times internally
 
 ## Architecture
+
+### Current Mode (Synchronous)
 
 ```
 User / Claude Code
@@ -256,12 +286,13 @@ User / Claude Code
        | python scripts/docgen.py --type pptx --prompt "..."
        |
        v
-  boto3 invoke_agent_runtime()
+  boto3 invoke_agent_runtime()  ←── retry with backoff on transient errors
        |
        v
   AWS Bedrock AgentCore Runtime
        |
        | Strands Agent + Claude Opus 4.6 + Code Interpreter
+       | MaxToolCallsHook (20 calls) + Base64CaptureHook
        |
        v
   Generated file (base64 encoded in response)
@@ -269,3 +300,32 @@ User / Claude Code
        v
   Decoded and saved to --output path
 ```
+
+### Auto-Split Mode (for 15+ slide PPTX)
+
+```
+User / Claude Code
+       |
+       | python scripts/docgen.py --type pptx --prompt-file big.txt -o deck.pptx
+       |
+       v
+  _count_slides_in_prompt() → 22 slides detected
+       |
+       v
+  _split_pptx_prompt() → [Batch 1: slides 1-11, Batch 2: slides 12-22]
+       |
+       v
+  ThreadPoolExecutor (parallel)
+       ├── generate("pptx", batch1) → Part1.pptx
+       └── generate("pptx", batch2) → Part2.pptx
+       |
+       v
+  _merge_pptx_files([Part1.pptx, Part2.pptx]) → deck.pptx
+```
+
+### Production Mode (Async — for team/service deployments)
+
+For production use with Amazon Quick Suite, see the full async architecture in
+`sample-amazon-quick-suite-knowledge-hub/docs/use-cases/document-generation-mcp-agentcore-runtime/`.
+
+This uses: submit_job Lambda → fire-and-forget → Step Function polling → direct-persist to S3 → CloudFront download URL. No client-side timeout concerns.
