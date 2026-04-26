@@ -100,3 +100,17 @@ open(os.path.expanduser('~/memory.log'), 'a').write(entry)
 ```
 
 This ensures memory.log always has a record of the latest memory state.
+
+# Temp Files
+
+All temporary files should be stored in `~/tmp/` folder.
+
+# Tokenmaxxer
+
+Tokenmaxxer is a motivational agent skill installed at `~/.claude/skills/tokenmaxxer/`. It drives Claude Code to do deeper, more thorough work through three layers: Identity, Self-Reflection, and Aspiration.
+
+- Skill: `~/.claude/skills/tokenmaxxer/SKILL.md`
+- Identity template: `~/.claude/tokenmaxxer-identity.md`
+- Hooks: `~/.claude/hooks/tokenmaxxer/` (reflect.sh, aspire.sh, reinject.sh)
+- Hook config: `~/.claude/settings.json`
+- Source repo: `~/codes/awesome-claude/skills/tokenmaxxer/`
