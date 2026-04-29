@@ -1,5 +1,7 @@
 # Image Moderation Pipeline
 
+**[中文版](README_CN.md)** | English
+
 Cost-optimized image content moderation using Claude's vision capabilities. Combines preprocessing, perceptual hashing, and a tiered model cascade to reduce costs by up to **95%+** compared to naive approaches.
 
 ## Architecture
