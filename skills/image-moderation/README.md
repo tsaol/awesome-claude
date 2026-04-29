@@ -41,6 +41,49 @@ User Upload
 
 **Combined: ~95%+ total cost reduction**
 
+### Detailed Cost Breakdown (1M images/month, baseline: raw 4K → Sonnet)
+
+| # | Strategy | Before | After | Savings | Monthly Cost Impact |
+|---|----------|--------|-------|---------|-------------------|
+| 1 | **Image resizing** (4K→768px) | ~8,000 input tokens/image | ~1,000 input tokens/image | **85% fewer input tokens** | $18,000 → $2,250 (-$15,750) |
+| 2 | **Prompt caching** (system prompt) | 500 tokens @ $3.00/M (Sonnet) | 500 tokens @ $0.30/M (cache hit) | **90% cheaper on system prompt** | $1,500 → $150 (-$1,350) |
+| 3 | **Tiered cascade** (Haiku first) | 1M images × Sonnet ($3.00/M input) | 900K × Haiku ($0.80/M) + 100K × Sonnet ($3.00/M) | **~70% cheaper per-request avg** | $3,000 → $1,020 (-$1,980) |
+| 4 | **Batch API** (async 50% off) | Standard API pricing | 50% discount on all tokens | **50% off entire bill** | $1,020 → $510 (-$510) |
+| 5 | **Structured output** (JSON only) | ~150 output tokens @ $15.00/M (Sonnet) | ~20 output tokens @ $4.00/M (Haiku) | **96% cheaper on output** | $2,250 → $80 (-$2,170) |
+| 6 | **pHash pre-filter** (known images) | 100% images hit API | ~90% images hit API (10% filtered free) | **10% fewer API calls** | Removes ~$50-100 at pipeline level |
+
+> **Note:** Rows are not strictly additive — strategies compound. The table shows the isolated impact of each technique. When combined sequentially, total cost drops from **~$18,000 to ~$33/month**.
+
+### Strategy-by-Strategy Cost Waterfall
+
+```
+$18,000  ← Baseline: raw 4K images → Sonnet, verbose output
+   │
+   │  [1] Image resizing (4K → 768px)         -85% input tokens
+   ▼
+ $2,700
+   │
+   │  [2] Switch to Haiku + prompt caching     -73% model cost + cached system prompt
+   ▼
+   $730
+   │
+   │  [3] Tiered cascade (only 10% → Sonnet)   -90% Sonnet usage
+   ▼
+   $340
+   │
+   │  [5] Structured output (150→20 tokens)    -87% output tokens
+   ▼
+   $130
+   │
+   │  [6] pHash pre-filter (10% zero-cost)     -10% API calls
+   ▼
+   $117
+   │
+   │  [4] Batch API (50% off remaining)        -50% all tokens
+   ▼
+    $58  ← Final: full pipeline + batch
+```
+
 ---
 
 ### Strategy 1: Image Resizing (~85% token reduction)
