@@ -126,12 +126,11 @@ Each Claude model has a specific knowledge cutoff embedded in its weights:
 | Model | Expected Cutoff |
 |-------|----------------|
 | Claude Opus 4.6 | 2025-03 |
-| Claude Sonnet 4.6 | 2025-03 |
+| Claude Sonnet 4.6 | 2025-02 |
 | Claude Haiku 4.5 | 2025-03 |
 | Claude Sonnet 4.5 | 2025-02 |
 | Claude Opus 4.5 | 2025-02 |
-| Claude 3.5 Sonnet | 2024-04 |
-| Claude 3 Opus | 2024-01 |
+| Claude Sonnet 4 | 2025-02 |
 
 The test sends the request with an **empty system prompt** (`system: ""`) to strip any proxy-injected persona. If you request Opus 4.6 but get a cutoff of "2024-10", you're likely getting an older Sonnet.
 
@@ -142,8 +141,13 @@ Model size dictates speed. These are physical constraints that cannot be faked:
 | Model | Expected TTFT | Expected TPS |
 |-------|--------------|-------------|
 | Opus | 1.5-3.0s | 25-45 tokens/s |
-| Sonnet | 0.5-1.5s | 70-110 tokens/s |
+| Sonnet 4.6 | 0.8-2.0s | 30-55 tokens/s |
 | Haiku | 0.2-0.5s | 100-200 tokens/s |
+
+Real Bedrock baseline for Sonnet 4.6 (10 rounds):
+- Latency: 4.31s avg (stdev 1.12s) for ~155 token output
+- TPS: 37.3 avg (range 20-42)
+- Cutoff: "2025-02" (8/10 consistent)
 
 **Key insight**: If your "Opus" responds with TTFT < 1s and TPS > 80, it's physically impossible for it to be Opus. This is the hardest test to cheat — you'd need to artificially add delay, but that costs the proxy operator money.
 

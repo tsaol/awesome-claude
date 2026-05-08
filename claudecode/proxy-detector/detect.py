@@ -44,17 +44,16 @@ MAGIC_STRING = (
 
 KNOWN_CUTOFFS = {
     "claude-opus-4-6": "2025-03",
-    "claude-sonnet-4-6": "2025-03",
+    "claude-sonnet-4-6": "2025-02",
     "claude-haiku-4-5": "2025-03",
     "claude-sonnet-4-5": "2025-02",
     "claude-opus-4-5": "2025-02",
-    "claude-3-5-sonnet": "2024-04",
-    "claude-3-opus": "2024-01",
+    "claude-sonnet-4": "2025-02",
 }
 
 EXPECTED_LATENCY = {
     "opus": {"min_ttft": 1.5, "max_tps": 45},
-    "sonnet": {"min_ttft": 0.5, "max_tps": 110},
+    "sonnet": {"min_ttft": 0.8, "max_tps": 55},
     "haiku": {"min_ttft": 0.2, "max_tps": 200},
 }
 
