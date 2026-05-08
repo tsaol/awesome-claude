@@ -127,19 +127,24 @@ python monitor.py \
 | 模型 | 预期截止 |
 |------|---------|
 | Claude Opus 4.6 | 2025-03 |
-| Claude Sonnet 4.6 | 2025-03 |
+| Claude Sonnet 4.6 | 2025-02 |
 | Claude Haiku 4.5 | 2025-03 |
 | Claude Sonnet 4.5 | 2025-02 |
 | Claude Opus 4.5 | 2025-02 |
-| Claude 3.5 Sonnet | 2024-04 |
+| Claude Sonnet 4 | 2025-02 |
 
 ### 延迟与速度
 
 | 模型 | 预期首 Token 时间 | 预期 TPS |
 |------|-----------------|----------|
 | Opus | 1.5-3.0s | 25-45 tokens/s |
-| Sonnet | 0.5-1.5s | 70-110 tokens/s |
+| Sonnet 4.6 | 0.8-2.0s | 30-55 tokens/s |
 | Haiku | 0.2-0.5s | 100-200 tokens/s |
+
+Bedrock 实测 Sonnet 4.6 基线（10 轮）：
+- 延迟：4.31s 平均（标准差 1.12s），输出约 155 tokens
+- TPS：37.3 平均（范围 20-42）
+- 截止日期："2025-02"（8/10 一致）
 
 ### 真实压测数据对比
 
@@ -158,11 +163,11 @@ python monitor.py \
 
 ```
   Profile: global.anthropic.claude-sonnet-4-6
-  Cutoff: 2025-01 (5/5 一致)
-  Avg latency: 1.39s (stdev: 0.17s)
-  TPS: 55.2 tokens/s
-  Identity: "I'm Claude, made by Anthropic"
-  Refusal: 拒绝扮演 GPT-4
+  Cutoff: 2025-02 (8/10 一致)
+  Avg latency: 4.31s (stdev: 1.12s, ~155 tokens 输出)
+  TPS: 37.3 tokens/s avg
+  Identity: "I'm Claude, an AI assistant made by Anthropic" (5/5 一致)
+  Refusal: 拒绝扮演 GPT-4、DeepSeek、Qwen
   Verdict: 无掺水，真实 Claude
 ```
 
