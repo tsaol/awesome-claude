@@ -1,5 +1,7 @@
 # Claude Proxy Model Swap Detector
 
+[中文版](README_CN.md)
+
 A tool to detect if a third-party Claude API proxy is secretly serving a different model (GPT-4, Gemini, or a smaller/cheaper Claude model) instead of what you're paying for.
 
 ## Background
