@@ -193,14 +193,3 @@ The official Anthropic API returns specific headers (`x-request-id`, `anthropic-
 4. **Check if extended thinking works** — Claude-specific features can't be faked by GPT
 5. **Monitor over time** — run weekly checks, as proxies may change backend models
 
-## Related Projects
-
-- [ccproxy](https://github.com/QAA-Tools/ccproxy) — Claude API reverse proxy with batch testing
-- [claude-code-router](https://github.com/musistudio/claude-code-router) — Model routing for Claude Code
-- [CLIProxyAPI](https://cloud.tencent.com/developer/article/2636407) — Gemini + Claude API proxy
-
-## References
-
-- [花 Opus 的钱买到 Sonnet？一行 Python 代码揭穿 API 服务商的"降本增效"骗局](https://www.cnblogs.com/sprinng/p/19574478) — Deep technical breakdown of detection methods
-- [避坑指南：如何识别第三方API中转站的"套壳"假Claude模型](https://www.80aj.com/2026/04/23/api-clude-model-guide/) — Practical tips for identifying fake Claude
-- [Claude Code 接入自建开源模型 (AWS Blog)](https://aws.amazon.com/cn/blogs/china/claude-code-open-source-model-enterprise-practice/) — Enterprise proxy architecture
