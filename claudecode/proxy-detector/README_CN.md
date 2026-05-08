@@ -187,8 +187,3 @@ Bedrock 实测 Sonnet 4.6 基线（10 轮）：
 - 知识截止可以通过 RAG 部分伪造
 - 最佳效果：组合所有测试 + 不同时间多次运行
 
-## 参考资料
-
-- [花 Opus 的钱买到 Sonnet？一行 Python 代码揭穿 API 服务商的"降本增效"骗局](https://www.cnblogs.com/sprinng/p/19574478)
-- [避坑指南：如何识别第三方 API 中转站的"套壳"假 Claude 模型](https://www.80aj.com/2026/04/23/api-clude-model-guide/)
-- [Claude Code 接入自建开源模型（AWS 官方博客）](https://aws.amazon.com/cn/blogs/china/claude-code-open-source-model-enterprise-practice/)
