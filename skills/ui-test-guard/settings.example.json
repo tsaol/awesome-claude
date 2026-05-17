@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/ui-test-guard/ui-test-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
