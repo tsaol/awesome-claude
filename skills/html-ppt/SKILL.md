@@ -2,160 +2,376 @@
 inclusion: manual
 ---
 
-# HTML PPT Skill — 手搓单文件 deck
+# HTML PPT Skill
 
-> 调用方式：在聊天里输入 `#html-ppt` + 你的内容主题，我会按 Cao Liu 的固定风格生成一个单文件 HTML deck（无外部依赖，双击即开）。
+> Invoke with `#html-ppt` + your topic. Generates a single-file HTML deck with zero dependencies.
 >
-> 参考样本：
-> - `GlobalOperation/growth/amazon-growth-design-rehearsal.html`（完整 19 页彩排版）
-> - `GlobalOperation/growth/amazon-growth-design-walkthrough.html`（可滚动文档版）
-> - `HR/AZA/presentations/html/shein_agent_review_slide.html`（单页 1280×720 slide）
+> Reference samples:
+> - `GlobalOperation/growth/amazon-growth-design-rehearsal.html`
+> - `GlobalOperation/growth/amazon-growth-design-walkthrough.html`
+> - `HR/AZA/presentations/html/shein_agent_review_slide.html`
 
 ---
 
-## 这个 skill 的定位
+## Positioning
 
-不是 reveal.js / Slidev / Spectacle 这些框架。是**手搓的单 HTML 文件**，零依赖、零联网、零安装，双击就开。
+Not reveal.js / Slidev / Spectacle. **A hand-crafted single HTML file** — zero dependencies, zero network, double-click to open.
 
-**适用场景**：
-- 自己练讲（rehearsal）
-- 给 BD / 同事内部传阅
-- 要在客户现场打开但又不能保证联网
-- 一次性 deck，不想维护
-
-**不适用场景**：
-- 需要复杂动画 / 过场效果
-- 需要嵌入复杂 React 组件 / 实时 demo
-- 团队多人协作长期维护
-
-那些场景用 `#reveal-ppt` 这个 skill。
+**Good for**: rehearsal, internal sharing, offline presentations, one-shot decks.
+**Not for**: complex animations, React components, long-term team maintenance. Use `#reveal-ppt` for those.
 
 ---
 
-## 你的任务
+## Detect Mode
 
-当用户调用 `#html-ppt` 时，按下面的步骤生成 deck。
+Determine what the user wants:
 
-### Step 1: 确认意图
+- **Mode A: New Presentation** — Create from scratch. Go to Step 1.
+- **Mode B: PPT Conversion** — Convert a .pptx file. Go to PPT Conversion section.
+- **Mode C: Enhancement** — Improve an existing HTML presentation. Follow Mode C rules below.
 
-先问清楚（如果用户没说全）：
+### Mode C: Modification Rules
 
-1. **主题 / 内容**是什么？
-2. **deck 类型**是哪种：
-   - `rehearsal` — 给自己练讲，每页带 speaker notes（黑底右栏，按 N 切换）
-   - `walkthrough` — 内部消化文档，可滚动长页（不分页）
-   - `slide-deck` — 多页演示，键盘翻页
-   - `single-slide` — 单页 1280×720 海报式
-3. **目标受众**（决定语气）：自己 / 团队 / 客户
-4. **页数 / 章节**：用户给章节我才能定页数
+When enhancing existing presentations, viewport fitting is the biggest risk:
 
-如果用户说"按你看着办"，默认走 `slide-deck` + 8–12 页。
+1. **Before adding content:** Count existing elements, check against density limits
+2. **Adding images:** Must have `max-height: min(50vh, 400px)`. If slide already has max content, split into two slides
+3. **Adding text:** Max 4-5 bullets per slide. Exceeds limits? Split into continuation slides
+4. **After ANY modification, verify:** `.slide` has `overflow: hidden`, new elements use `clamp()`, images have viewport-relative max-height, content fits at 1280x720
+5. **Proactively reorganize:** If modifications will cause overflow, automatically split content and inform the user. Don't wait to be asked
 
-### Step 2: 选 layout 模板
+**When adding images to existing slides:** Move image to new slide or reduce other content first. Never add images without checking if existing content already fills the viewport.
 
-每个 deck 由这些 layout 组合：
+---
 
-| Layout | 用途 | 例子 |
-|--------|------|------|
-| **cover** | 封面 | 标题 + 副标题 + meta 行 |
-| **section-title** | 章节分隔 | 大字 + eyebrow tag |
-| **bullet** | 要点列表 | 标题 + 3–5 条 ul |
-| **layers** | 三栏 / 三层模型 | 三个橙底 box（mental model） |
-| **stats** | 数据展示 | 4 个深蓝卡 + 橙数字 |
-| **flow** | 流程步骤 | 编号圆圈 + 标题 + 描述 |
-| **compare** | 两栏对比 | A vs B 双 box |
-| **quote** | 引言 / 客户原话 | 浅橙底 + 橙左边线 |
-| **callout** | 关键 takeaway | 深蓝底白字框 |
-| **punch-line** | 大字结论 | 60–64px，可双色高亮 |
-| **schedule** | 时间表 / 议程 | 深蓝表头表格 |
-| **bezos-style** | 名言页 | 黑底渐变 + 引言 |
-| **end** | 结束页 | "Ready / 谢谢 / Q&A" |
+## Core Principles
 
-不要凭空发明 layout。混用上面这些就够。
+1. **Zero Dependencies** — Single HTML file, all CSS/JS inline. No npm, no CDN.
+2. **Viewport Fitting (NON-NEGOTIABLE)** — Every slide MUST fit exactly in 100vh. No scrolling within slides. Content overflows? Split into multiple slides.
+3. **Distinctive Design** — Avoid generic "AI slop." Choose fonts and colors that feel custom-crafted.
+4. **Show, Don't Tell** — When user is unsure of style, generate visual previews (save to `~/tmp/slide-previews/`).
 
-### Step 3: 套用品牌样式（强制）
+---
 
-**色板（必须用）**：
-- `#FF9900` — Amazon 橙，accent / highlight / 数字 / 链接
-- `#c45500` — 深橙，eyebrow / tag 文字
-- `#232F3E` — Amazon 深蓝，标题 / 深色背景 / 卡
-- `#FFF8EE` — 浅橙底，layers / quote
-- `#FFE0B2` — 橙边线
-- `#fff / #1a1a1a / #333 / #555 / #666 / #888 / #ccc` — 中性色阶
+## Viewport Fitting Rules
 
-**字体（必须用）**：
+These apply to EVERY slide:
+
+- Every `.slide` must have `height: 100vh; height: 100dvh; overflow: hidden;`
+- ALL font sizes and spacing must use `clamp(min, preferred, max)` — never fixed px alone
+- Include the full contents of [viewport-base.css](viewport-base.css) in every presentation
+- Include `prefers-reduced-motion` support
+- Never negate CSS functions directly (`-clamp()` is silently ignored) — use `calc(-1 * clamp(...))`
+
+### Content Density Limits Per Slide
+
+| Slide Type | Maximum Content |
+|---|---|
+| Title/Cover | 1 heading + 1 subtitle + optional tagline |
+| Bullet | 1 heading + 4-5 bullet points |
+| Layers/Grid | 1 heading + 3 cards (3-column grid) |
+| Stats | 1 heading + 4 stat boxes |
+| Quote | 1 quote (max 3 lines) + attribution |
+| Punch-line | 1 large text block (2-3 lines) |
+| Code | 1 heading + 8-10 lines of code |
+
+**Content exceeds limits? Split into multiple slides. Never cram, never scroll.**
+
+---
+
+## Your Task
+
+When user invokes `#html-ppt`:
+
+### Step 1: Confirm Intent
+
+Ask (if not already specified):
+
+1. **Topic / content** — What is this about?
+2. **Deck type**:
+   - `rehearsal` — Speaker notes in dark right panel, timer (N to toggle notes, T for timer)
+   - `walkthrough` — Scrollable long-page document (no pagination)
+   - `slide-deck` — Multi-page presentation with keyboard navigation
+   - `single-slide` — Single 1280x720 poster slide
+3. **Target audience** — Self / team / client (determines tone)
+4. **Slide count / sections** — Default: 8-12 slides
+
+If user says "up to you", default to `slide-deck` + 8-12 slides.
+
+### Step 2: Choose Style
+
+Ask user's style preference:
+
+**Option A: Amazon Brand** — Orange + dark blue, professional corporate. Skip to Step 3.
+**Option B: Pick a preset** — Choose from 12 curated presets directly. See [STYLE_PRESETS.md](STYLE_PRESETS.md).
+**Option C: Show me options (recommended for custom)** — Generate 3 visual previews based on mood.
+
+#### "Show me options" flow:
+
+1. Ask the mood: Impressed/Confident | Excited/Energized | Calm/Focused | Inspired/Moved
+2. Based on mood, pick 3 presets from the mood-to-preset table in [STYLE_PRESETS.md](STYLE_PRESETS.md)
+3. Generate 3 single-slide HTML preview files (one per preset) showing title slide with typography, colors, animation
+4. Save previews to `~/tmp/slide-previews/` (style-a.html, style-b.html, style-c.html)
+5. Open each preview for the user
+6. Ask which they prefer: Style A / Style B / Style C / Mix elements
+
+Each preview should be ~50-100 lines, self-contained, showing one animated title slide with the preset's exact fonts, colors, and signature elements.
+
+#### "Pick a preset" flow:
+
+User names a preset directly (e.g., "Bold Signal", "Neon Cyber"). Read [STYLE_PRESETS.md](STYLE_PRESETS.md) for specs and generate using those exact fonts, colors, and signature elements.
+
+If user says "up to you" or doesn't specify, default to Amazon Brand.
+
+### Step 3: Amazon Brand Style (when applicable)
+
+**Colors (required for Amazon brand)**:
+- `#FF9900` — Amazon orange, accent / highlight / numbers
+- `#c45500` — Deep orange, eyebrow / tag text
+- `#232F3E` — Amazon dark blue, headings / dark backgrounds
+- `#FFF8EE` — Light orange background for layers/quotes
+- `#FFE0B2` — Orange borders
+- `#fff / #1a1a1a / #333 / #555 / #666 / #888 / #ccc` — Neutral scale
+
+**Font**:
 ```css
 font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
 ```
 
-**顶部 6px 渐变条（每个 deck 必有）**：
+**Top 6px gradient bar (every deck must have)**:
 ```css
-.top-bar {
-  height: 6px;
-  background: linear-gradient(90deg, #FF9900 0%, #232F3E 100%);
-}
+.top-bar { height: 6px; background: linear-gradient(90deg, #FF9900 0%, #232F3E 100%); }
 ```
 
-**圆角统一**：8px / 10px / 12px，不要其他值。
+**Border radius**: 8px / 10px / 12px only.
 
-**字号阶梯**：
-- 封面 H1: 56px
-- 普通 H2: 44px
-- H3: 24px
-- 正文: 22px（slide）/ 14px（walkthrough）
-- punch-line: 60–64px
-- eyebrow: 13px，全大写，letter-spacing 2px
+**Font size ladder**:
+- Cover H1: 56px → `clamp(2rem, 5vw, 3.5rem)`
+- H2: 44px → `clamp(1.5rem, 3.5vw, 2.75rem)`
+- Body: 22px → `clamp(0.9rem, 1.8vw, 1.375rem)`
+- Punch-line: 60-64px → `clamp(2.5rem, 6vw, 4rem)`
+- Eyebrow: 13px, uppercase, letter-spacing 2px
 
-### Step 4: 交互层（slide-deck 和 rehearsal 必须有）
+### Step 4: Layout Building Blocks
+
+| Layout | Use | Description |
+|--------|-----|-------------|
+| **cover** | Opening | Title + subtitle + meta line |
+| **section-title** | Chapter divider | Large text + eyebrow tag |
+| **bullet** | Key points | Heading + 3-5 ul items |
+| **layers** | 3-column model | Three colored boxes (mental model) |
+| **stats** | Data display | 4 dark-blue cards with orange numbers |
+| **flow** | Process steps | Numbered circles + title + description |
+| **compare** | Two-column contrast | A vs B dual boxes |
+| **quote** | Citation | Light orange background + orange left border |
+| **callout** | Key takeaway | Dark-blue background white text |
+| **punch-line** | Big conclusion | 60-64px, dual-color highlight |
+| **table-wrap** | Data table | Dark header, clean rows |
+| **timeline** | Chronological | Left-line with dots and items |
+| **schedule** | Agenda / timeline | Dark header table |
+| **end** | Closing | "Questions?" / thank you / CTA |
+
+Do not invent new layouts. Mix these blocks.
+
+### Step 5: Interaction Layer (slide-deck and rehearsal)
 
 ```javascript
-// 必备
-- ← / → / Space / PageUp / PageDown 翻页
-- Home / Esc 回首页
-- End 跳最后一页
+// Required:
+// ← / → / Space / PageDown: next/prev
+// Home / Esc: first slide
+// End: last slide
+// Click: next slide (except on controls/dots)
+// Nav dots (right side, active dot highlights on slide change, clickable)
+// Progress bar (top 2px, proportional fill)
+// Page counter (1 / N)
 
-// rehearsal 额外
-- N 切换 speaker notes（body 加 .show-notes class）
-- T 启停计时器（右下角显示 mm:ss）
-- R 重置计时器
-- 进度条（顶部 2px，按页数比例填充）
-- 页码 (1 / N)
-- 点击空白翻页
+// Rehearsal additional:
+// N: toggle speaker notes
+// T: start/stop timer
+// R: reset timer
 ```
 
-代码骨架放在最下面"通用脚手架"那一节，直接改不要重写。
+### Step 6: Speaker Notes (rehearsal only)
 
-### Step 5: Speaker notes 写法（rehearsal 类型才有）
+Each slide's notes must include:
+1. **How to say it** — Opening sentence for this slide
+2. **Key pauses** — Where to stop, where to emphasize
+3. **Potential questions** — What the audience might ask
+4. **Red lines** — What NOT to say on this slide
 
-每张 slide 的 notes 必须包含：
+### Step 7: Output
 
-1. **How to say it** — 这页要怎么开口讲（一段话）
-2. **关键停顿点** — 哪里要停、哪里要加重
-3. **可能的延伸问题** — 客户可能问什么，怎么接
-4. **红线** — 这页最容易踩的错（不要说什么）
+Generate the complete HTML file directly. Naming:
+- `<topic>-rehearsal.html`
+- `<topic>-walkthrough.html`
+- `<topic>-deck.html`
+- `<topic>-slide.html`
 
-不要把 notes 当 cheat sheet。它是"演练剧本"。
-
-### Step 6: 输出
-
-不要先解释，**直接生成完整 HTML 文件**。文件路径放在用户指定的目录下，命名：
-
-- `<topic>-rehearsal.html` （彩排版）
-- `<topic>-walkthrough.html` （文档版）
-- `<topic>-deck.html` （演示版）
-- `<topic>-slide.html` （单页）
-
-生成完毕后，给用户一行 `open` 命令直接打开，再给 3–5 个使用提示（按键 / 注意事项）。
+After generation, give the user an `open` command and usage tips (keys, notes).
 
 ---
 
-## 通用脚手架（直接复用，不要重写）
+## Image Handling
 
-### Slide-deck / Rehearsal 骨架
+When user provides images for the presentation:
+
+### Step 1: Evaluate Images
+
+1. **Scan** — List all image files (.png, .jpg, .svg, .webp)
+2. **View each image** — Use the Read tool (Claude is multimodal)
+3. **Evaluate** — For each: what it shows, USABLE or NOT USABLE (with reason), dominant colors
+4. **Co-design the outline** — Images inform slide structure alongside text. Don't "plan slides then add images" — design around both from the start
+
+### Step 2: Process Images
+
+```python
+from PIL import Image, ImageDraw
+
+# Circular crop (for logos on rounded aesthetics)
+def crop_circle(input_path, output_path):
+    img = Image.open(input_path).convert('RGBA')
+    w, h = img.size
+    size = min(w, h)
+    left, top = (w - size) // 2, (h - size) // 2
+    img = img.crop((left, top, left + size, top + size))
+    mask = Image.new('L', (size, size), 0)
+    ImageDraw.Draw(mask).ellipse([0, 0, size, size], fill=255)
+    img.putalpha(mask)
+    img.save(output_path, 'PNG')
+
+# Resize (for oversized images)
+def resize_max(input_path, output_path, max_dim=1200):
+    img = Image.open(input_path)
+    img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+    img.save(output_path, quality=85)
+```
+
+| Situation | Operation |
+|-----------|-----------|
+| Square logo on rounded aesthetic | `crop_circle()` |
+| Image > 1MB | `resize_max(max_dim=1200)` |
+| Wrong aspect ratio | Manual crop with `img.crop()` |
+
+### Step 3: Place Images in HTML
+
+```css
+.slide-image {
+    max-width: 100%;
+    max-height: min(50vh, 400px);
+    object-fit: contain;
+    border-radius: 8px;
+}
+.slide-image.screenshot {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+.slide-image.logo {
+    max-height: min(30vh, 200px);
+}
+```
+
+**Rules:**
+- Use relative file paths (not base64) for images unless embedding a single logo
+- Never repeat the same image on multiple slides (except logos on title + closing)
+- Adapt border/shadow colors to match the chosen style's accent
+- Logo: centered on title slide. Screenshots: two-column layout with text
+
+---
+
+## PPT Conversion
+
+When user provides a .pptx file:
+
+1. Run `python scripts/extract-pptx.py <input.pptx> <output_dir>` (install python-pptx if needed)
+2. Show extracted slide titles and image counts for confirmation
+3. Ask for style preference (Amazon brand or custom)
+4. Generate HTML preserving all text, images, and notes
+
+---
+
+## PDF Export
+
+After generating a deck, offer PDF export:
+
+```bash
+bash scripts/export-pdf.sh <path-to-html> [output.pdf] [--compact]
+```
+
+- Uses Playwright to screenshot each slide at 1920x1080
+- `--compact` flag renders at 1280x720 for smaller files
+- Animations are not preserved (static snapshots)
+
+---
+
+## Deploy (Vercel)
+
+After generating a deck, offer deployment for sharing:
+
+```bash
+bash scripts/deploy.sh <path-to-html>
+```
+
+- Deploys to a live URL that works on any device (phones, tablets, laptops)
+- Free hosting via Vercel, no server to maintain
+- Single HTML files are auto-wrapped with `index.html`
+- Referenced local assets (images, fonts) are bundled automatically
+
+**First-time setup:**
+1. Node.js required (`brew install node` or https://nodejs.org)
+2. Vercel CLI installs automatically via npx
+3. User runs `vercel login` if not already authenticated
+
+**Gotchas:**
+- Local images via CSS `background-image` may not be auto-detected; prefer `<img src="...">` or deploy a folder
+- Redeploying updates the same URL (no need to share new link)
+- Filenames with spaces work but get URL-encoded as `%20`
+
+---
+
+## Animation Patterns
+
+When generating decks, reference [animation-patterns.md](animation-patterns.md) for:
+- Entrance animations (fade+slide, scale, blur)
+- Background effects (gradient mesh, grid patterns)
+- Effect-to-feeling matching table
+
+Use `.reveal` class + Intersection Observer for scroll-triggered animations when building scroll-snap decks.
+
+---
+
+## Supporting Files
+
+| File | Purpose | When to Read |
+|------|---------|--------------|
+| [STYLE_PRESETS.md](STYLE_PRESETS.md) | 12 curated visual presets with colors, fonts, signatures | Style selection (Step 2) |
+| [viewport-base.css](viewport-base.css) | Mandatory responsive CSS | Always (include in every deck) |
+| [animation-patterns.md](animation-patterns.md) | Animation reference | When adding motion effects |
+| [scripts/extract-pptx.py](scripts/extract-pptx.py) | PPT content extraction | When converting .pptx files |
+| [scripts/export-pdf.sh](scripts/export-pdf.sh) | PDF export | When user wants PDF output |
+| [scripts/deploy.sh](scripts/deploy.sh) | Deploy to Vercel for sharing | When user wants a live URL |
+
+---
+
+## Red Lines
+
+- Do NOT use external CDN / npm packages (zero-dependency is the soul of this skill)
+- Do NOT use green / purple / blue for accent colors in Amazon brand mode
+- Do NOT use emoji as decoration (use SVG or unicode geometric symbols)
+- Do NOT exceed 5 bullet points per slide
+- Do NOT use font sizes below 14px (slide) / 12px (walkthrough)
+- Do NOT skip speaker notes in rehearsal decks
+- Do NOT use `<table>` for layout (use grid / flex)
+- Do NOT use fixed px without responsive clamp() fallback
+- Do NOT allow any slide to scroll — split content instead
+
+---
+
+## Skeleton (slide-deck / rehearsal)
 
 ```html
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -173,14 +389,15 @@ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-s
     width: 100%; height: 100%;
     display: none;
     background: #fff; color: #1a1a1a;
+    overflow: hidden;
   }
   .slide.active { display: flex; flex-direction: column; }
   .top-bar { height: 6px; background: linear-gradient(90deg, #FF9900 0%, #232F3E 100%); }
   .slide-body { flex: 1; display: flex; overflow: hidden; }
   .slide-main {
-    flex: 1; padding: 60px 80px 40px;
+    flex: 1; padding: clamp(1.5rem, 4vw, 60px) clamp(2rem, 6vw, 80px) clamp(1rem, 3vw, 40px);
     display: flex; flex-direction: column; justify-content: center;
-    overflow: auto;
+    overflow: hidden;
   }
   .slide.has-notes .slide-main { flex: 1.6; }
   .slide-notes {
@@ -191,17 +408,17 @@ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-s
   body.show-notes .slide.has-notes .slide-notes { display: block; }
 
   .eyebrow {
-    font-size: 13px; color: #FF9900; font-weight: 700;
+    font-size: clamp(0.7rem, 1vw, 0.8125rem); color: #FF9900; font-weight: 700;
     text-transform: uppercase; letter-spacing: 2px;
-    margin-bottom: 16px;
+    margin-bottom: clamp(0.5rem, 1.5vw, 1rem);
   }
   .slide h2 {
-    font-size: 44px; font-weight: 700; color: #232F3E;
+    font-size: clamp(1.5rem, 3.5vw, 2.75rem); font-weight: 700; color: #232F3E;
     line-height: 1.15; letter-spacing: -0.5px;
-    margin-bottom: 24px;
+    margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
   }
-  .slide p { font-size: 22px; color: #333; line-height: 1.6; margin-bottom: 16px; }
-  .slide ul { font-size: 22px; color: #333; line-height: 1.7; margin-left: 28px; margin-bottom: 16px; }
+  .slide p { font-size: clamp(0.9rem, 1.8vw, 1.375rem); color: #333; line-height: 1.6; margin-bottom: 1rem; }
+  .slide ul { font-size: clamp(0.9rem, 1.8vw, 1.375rem); color: #333; line-height: 1.7; margin-left: 28px; margin-bottom: 1rem; }
   .slide .accent { color: #FF9900; font-weight: 700; }
 
   .controls {
@@ -218,32 +435,57 @@ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-s
     z-index: 99;
   }
 
+  /* Nav dots */
+  .nav-dots {
+    position: fixed; right: clamp(1rem, 2vw, 2rem); top: 50%;
+    transform: translateY(-50%); z-index: 100;
+    display: flex; flex-direction: column; gap: clamp(6px, 1vh, 12px);
+  }
+  .nav-dot {
+    width: clamp(8px, 0.8vw, 12px); height: clamp(8px, 0.8vw, 12px);
+    border-radius: 50%; background: rgba(0, 0, 0, 0.2);
+    border: none; cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .nav-dot.active {
+    background: #FF9900; transform: scale(1.4);
+  }
+  @media (max-height: 600px) { .nav-dots { display: none; } }
+
   /* === LAYOUT BLOCKS === */
-  .layers { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px; }
-  .layer { background: #FFF8EE; border: 2px solid #FFE0B2; border-radius: 12px; padding: 24px; }
+  .layers { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: clamp(0.75rem, 1.5vw, 1.25rem); margin-top: clamp(1rem, 2.5vw, 1.875rem); }
+  .layer { background: #FFF8EE; border: 2px solid #FFE0B2; border-radius: 12px; padding: clamp(1rem, 2vw, 1.5rem); }
   .layer .ln { font-size: 12px; color: #c45500; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
 
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 24px; }
-  .stat { background: #232F3E; border-radius: 10px; padding: 26px 18px; text-align: center; }
-  .stat .num { font-size: 40px; color: #FF9900; font-weight: 700; line-height: 1; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(0.5rem, 1.5vw, 1.125rem); margin-top: clamp(1rem, 2vw, 1.5rem); }
+  .stat { background: #232F3E; border-radius: 10px; padding: clamp(1rem, 2vw, 1.625rem) 18px; text-align: center; }
+  .stat .num { font-size: clamp(1.5rem, 3.5vw, 2.5rem); color: #FF9900; font-weight: 700; line-height: 1; }
   .stat .label { font-size: 13px; color: #ccc; margin-top: 8px; }
 
   .quote {
     background: #FFF8EE; border-left: 6px solid #FF9900;
-    padding: 24px 30px; margin-top: 24px;
+    padding: clamp(1rem, 2vw, 1.5rem) clamp(1.25rem, 2.5vw, 1.875rem);
+    margin-top: clamp(1rem, 2vw, 1.5rem);
     border-radius: 0 12px 12px 0;
-    font-size: 22px; color: #444; line-height: 1.6; font-style: italic;
+    font-size: clamp(0.9rem, 1.8vw, 1.375rem); color: #444; line-height: 1.6; font-style: italic;
   }
 
   .punch-line {
-    font-size: 64px; font-weight: 700; color: #232F3E;
+    font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 700; color: #232F3E;
     line-height: 1.2; letter-spacing: -1px;
+  }
+
+  /* Responsive: stack grids on narrow viewports */
+  @media (max-width: 768px) {
+    .layers { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
 </head>
 <body>
 
 <div class="progress" id="progress"></div>
+<div class="nav-dots" id="navDots"></div>
 
 <div class="deck" id="deck">
   <!-- SLIDES GO HERE -->
@@ -260,11 +502,24 @@ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-s
   document.getElementById('total').textContent = total;
   let cur = 0;
 
+  // Create nav dots
+  const dotsContainer = document.getElementById('navDots');
+  slides.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    dot.addEventListener('click', (e) => { e.stopPropagation(); show(i); });
+    dotsContainer.appendChild(dot);
+  });
+  const dots = dotsContainer.querySelectorAll('.nav-dot');
+
   function show(i) {
     if (i < 0) i = 0;
     if (i >= total) i = total - 1;
     slides[cur].classList.remove('active');
     slides[i].classList.add('active');
+    dots[cur].classList.remove('active');
+    dots[i].classList.add('active');
     cur = i;
     document.getElementById('cur').textContent = i + 1;
     document.getElementById('progress').style.width = ((i + 1) / total * 100) + '%';
@@ -303,6 +558,7 @@ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-s
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('.controls')) return;
+    if (e.target.closest('.nav-dots')) return;
     if (e.target.closest('.slide-notes')) return;
     show(cur + 1);
   });
@@ -312,81 +568,11 @@ font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-s
 </html>
 ```
 
-### Slide 模板
-
-```html
-<!-- Cover -->
-<div class="slide slide-cover">
-  <div class="top-bar"></div>
-  <div class="slide-body">
-    <div class="slide-main" style="background: linear-gradient(135deg, #232F3E 0%, #0d1421 100%); color: #fff;">
-      <h1 style="font-size: 56px; color: #fff;">__TITLE__<br><span class="accent">__SUBTITLE__</span></h1>
-      <div style="font-size: 20px; color: #ccc; margin-top: 24px;">__TAGLINE__</div>
-      <div style="font-size: 14px; color: #888; border-top: 1px solid #333; padding-top: 16px; margin-top: 30px;">📅 __DATE__ · __AUTHOR__</div>
-    </div>
-  </div>
-</div>
-
-<!-- Bullet w/ notes -->
-<div class="slide has-notes">
-  <div class="top-bar"></div>
-  <div class="slide-body">
-    <div class="slide-main">
-      <div class="eyebrow">__EYEBROW__</div>
-      <h2>__HEADING__</h2>
-      <ul>
-        <li>__POINT_1__</li>
-        <li>__POINT_2__</li>
-      </ul>
-    </div>
-    <div class="slide-notes">
-      <h4 style="color: #FF9900; text-transform: uppercase; letter-spacing: 2px; font-size: 14px; margin-bottom: 14px;">How to say it</h4>
-      <p style="font-size: 16px; color: #ddd; line-height: 1.7;">__NOTES__</p>
-    </div>
-  </div>
-</div>
-
-<!-- Punch line -->
-<div class="slide has-notes">
-  <div class="top-bar"></div>
-  <div class="slide-body">
-    <div class="slide-main">
-      <div class="eyebrow">__EYEBROW__</div>
-      <div class="punch-line">__LINE_1__<br><span class="accent">__HIGHLIGHT__</span><br>__LINE_2__</div>
-    </div>
-    <div class="slide-notes">...</div>
-  </div>
-</div>
-```
-
-### Walkthrough（可滚动文档版）骨架
-
-参考 `GlobalOperation/growth/amazon-growth-design-walkthrough.html`，区别：
-- 不分页，max-width 980px 居中
-- 每个 section 是白底圆角卡，间隔 24px
-- 顶部有 TOC 锚点跳转
-- 整体在 `#f7f7f7` 灰底上
-
 ---
 
-## 红线
+## Usage Examples
 
-不要做这些：
-
-- ❌ 引入任何外部 CDN / npm 包（这个 skill 的灵魂就是单文件零依赖）
-- ❌ 用绿色 / 紫色 / 蓝色（除了导航 link）—— 严格 Amazon 橙 + 深蓝
-- ❌ 用 emoji 当装饰（数字 / icon 用 SVG 或 unicode 几何符号）
-- ❌ 单页超过 5 个要点（信息过载）
-- ❌ 字号小于 14px（slide）/ 12px（walkthrough）
-- ❌ 不写 speaker notes 的 rehearsal deck
-- ❌ 用 `<table>` 做布局（用 grid / flex）
-
----
-
-## 用户怎么用
-
-- **基础**：`#html-ppt 给我做一个 X 主题的 deck，用 rehearsal 风格，10 页`
-- **指定参考**：`#html-ppt 参考 amazon-growth-design-rehearsal.html 的风格做一个 Y 主题`
-- **改造**：`#html-ppt 把 X.md 转成 walkthrough HTML`
-- **快速 punch line**：`#html-ppt 给我做一张单页 punch-line slide，内容是 ...`
-- **指定章节**：`#html-ppt 内容大纲：1) ... 2) ... 3) ...`
+- `#html-ppt Make a Performance Loop intro deck, 10 slides, for PMs and developers`
+- `#html-ppt Convert my-talk.pptx to a web slideshow`
+- `#html-ppt Quick single-slide poster for the team meeting`
+- `#html-ppt Rehearsal deck for my AWS re:Invent talk, 15 slides with speaker notes`
