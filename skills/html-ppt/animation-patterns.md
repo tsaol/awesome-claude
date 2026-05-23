@@ -61,6 +61,121 @@ Match animations to the intended feeling.
 }
 ```
 
+## Interactive Mouse Effects
+
+### Custom Cursor with Trail
+
+```css
+.custom-cursor {
+    position: fixed;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--accent, #00ffcc);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.1s ease;
+    mix-blend-mode: difference;
+}
+.cursor-trail {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    background: var(--accent, #00ffcc);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    opacity: 0.5;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+body { cursor: none; }
+```
+
+```javascript
+const cursor = document.querySelector('.custom-cursor');
+const trail = document.querySelector('.cursor-trail');
+document.addEventListener('mousemove', (e) => {
+    cursor.style.transform = `translate(${e.clientX - 10}px, ${e.clientY - 10}px)`;
+    trail.style.transform = `translate(${e.clientX - 4}px, ${e.clientY - 4}px)`;
+});
+```
+
+### 3D Tilt on Hover
+
+```javascript
+class TiltEffect {
+    constructor(element) {
+        this.element = element;
+        this.element.style.transformStyle = 'preserve-3d';
+        this.element.style.transition = 'transform 0.1s ease';
+
+        this.element.addEventListener('mousemove', (e) => {
+            const rect = this.element.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+            this.element.style.transform = `perspective(1000px) rotateY(${x * 10}deg) rotateX(${-y * 10}deg)`;
+        });
+
+        this.element.addEventListener('mouseleave', () => {
+            this.element.style.transform = 'perspective(1000px) rotateY(0) rotateX(0)';
+        });
+    }
+}
+// Usage: new TiltEffect(document.querySelector('.accent-card'));
+```
+
+### Magnetic Buttons
+
+```javascript
+class MagneticButton {
+    constructor(element, strength = 0.3) {
+        this.element = element;
+        this.strength = strength;
+
+        this.element.addEventListener('mousemove', (e) => {
+            const rect = this.element.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            this.element.style.transform = `translate(${x * this.strength}px, ${y * this.strength}px)`;
+        });
+
+        this.element.addEventListener('mouseleave', () => {
+            this.element.style.transform = 'translate(0, 0)';
+        });
+
+        this.element.style.transition = 'transform 0.2s ease';
+    }
+}
+// Usage: document.querySelectorAll('.nav-dot').forEach(el => new MagneticButton(el, 0.4));
+```
+
+### Cursor Auto-Hide (Presentation Mode)
+
+```javascript
+let hideTimeout;
+document.addEventListener('mousemove', () => {
+    document.body.style.cursor = '';
+    clearTimeout(hideTimeout);
+    hideTimeout = setTimeout(() => {
+        document.body.style.cursor = 'none';
+    }, 3000);
+});
+```
+
+### Hover Glow on Nav Dots
+
+```css
+.nav-dot {
+    transition: all 0.3s ease;
+}
+.nav-dot:hover {
+    box-shadow: 0 0 12px var(--accent, #FF9900);
+    transform: scale(1.5);
+}
+```
+
+---
+
 ## CSS Gotcha: Negating Functions
 
 ```css
