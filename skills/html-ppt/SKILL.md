@@ -334,9 +334,22 @@ bash scripts/deploy.sh <path-to-html>
 When generating decks, reference [animation-patterns.md](animation-patterns.md) for:
 - Entrance animations (fade+slide, scale, blur)
 - Background effects (gradient mesh, grid patterns)
+- Interactive mouse effects (custom cursor, 3D tilt, magnetic buttons, cursor auto-hide)
 - Effect-to-feeling matching table
 
 Use `.reveal` class + Intersection Observer for scroll-triggered animations when building scroll-snap decks.
+
+### Optional Interactive Effects (slide-deck type)
+
+Include these by default unless user opts out or requests minimal:
+
+1. **Cursor auto-hide** — Hide cursor after 3s inactivity (presentation mode feel)
+2. **Nav dot hover glow** — Glow + scale on hover for navigation dots
+3. **3D tilt on cards** — Cards/panels subtly rotate following mouse position
+4. **Magnetic buttons** — Nav dots and CTA buttons attract toward cursor
+
+For techy/futuristic styles (Neon Cyber, Terminal Green), also include:
+5. **Custom cursor with trail** — Replace default cursor with styled circle + trail
 
 ---
 
