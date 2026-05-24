@@ -84,14 +84,16 @@ Be direct and conversational in commit messages.
 
 # Memory Sync to memory.log
 
-After every conversation where memory files are created or updated (under `~/.claude/projects/-home-ubuntu/memory/`), sync the current memory index to `~/memory.log` by appending a timestamped entry:
+After every conversation where memory files are created or updated, sync the current memory index to `~/memory.log` by appending a timestamped entry:
 
 ```
 python3 -c "
-import datetime, os
-memory_dir = os.path.expanduser('~/.claude/projects/-home-ubuntu/memory')
-memory_md = os.path.join(memory_dir, 'MEMORY.md')
-content = open(memory_md).read().strip() if os.path.exists(memory_md) else 'No memory found'
+import datetime, os, glob
+# Auto-detect memory dir (works on any machine)
+pattern = os.path.expanduser('~/.claude/projects/*/memory/MEMORY.md')
+matches = glob.glob(pattern)
+memory_md = matches[0] if matches else ''
+content = open(memory_md).read().strip() if memory_md and os.path.exists(memory_md) else 'No memory found'
 entry = f'[{datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")}] [MEMORY SYNC]\n{content}\n{\"=\" * 80}\n'
 open(os.path.expanduser('~/memory.log'), 'a').write(entry)
 "
