@@ -124,4 +124,4 @@ Tokenmaxxer is a motivational agent skill installed at `~/.claude/skills/tokenma
 - Identity template: `~/.claude/tokenmaxxer-identity.md`
 - Hooks: `~/.claude/hooks/tokenmaxxer/` (reflect.sh, aspire.sh, reinject.sh)
 - Hook config: `~/.claude/settings.json`
-- Source repo: `~/codes/awesome-claude/skills/tokenmaxxer/`
+- Source repo: `~/code/awesome-claude/skills/tokenmaxxer/`
