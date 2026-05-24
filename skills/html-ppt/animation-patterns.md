@@ -63,41 +63,78 @@ Match animations to the intended feeling.
 
 ## Interactive Mouse Effects
 
-### Custom Cursor with Trail
+### Custom Cursor — Neon Line
+
+A glowing dot with a short fading neon trail that follows the cursor.
 
 ```css
 .custom-cursor {
     position: fixed;
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--accent, #00ffcc);
+    width: 8px; height: 8px;
+    background: var(--accent, #FF9900);
     border-radius: 50%;
     pointer-events: none;
     z-index: 9999;
-    transition: transform 0.1s ease;
-    mix-blend-mode: difference;
+    transform: translate(-4px, -4px);
+    transition: opacity 0.3s ease;
+    box-shadow: 0 0 12px var(--accent, #FF9900), 0 0 24px rgba(255, 153, 0, 0.4);
 }
-.cursor-trail {
-    position: fixed;
-    width: 8px;
-    height: 8px;
-    background: var(--accent, #00ffcc);
-    border-radius: 50%;
+canvas.neon-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
     pointer-events: none;
     z-index: 9998;
-    opacity: 0.5;
-    transition: transform 0.3s ease, opacity 0.3s ease;
 }
 body { cursor: none; }
+body * { cursor: none; }
+body.cursor-hidden .custom-cursor { opacity: 0; }
+```
+
+```html
+<canvas class="neon-canvas" id="neonCanvas" width="1920" height="1080"></canvas>
+<div class="custom-cursor" id="customCursor"></div>
 ```
 
 ```javascript
-const cursor = document.querySelector('.custom-cursor');
-const trail = document.querySelector('.cursor-trail');
+const customCursor = document.getElementById('customCursor');
+const neonCanvas = document.getElementById('neonCanvas');
+const neonCtx = neonCanvas.getContext('2d');
+let neonPoints = [];
+let cursorTimeout;
+
+function resizeNeon() { neonCanvas.width = window.innerWidth; neonCanvas.height = window.innerHeight; }
+requestAnimationFrame(resizeNeon); setTimeout(resizeNeon, 50); setTimeout(resizeNeon, 200);
+window.addEventListener('resize', resizeNeon);
+
 document.addEventListener('mousemove', (e) => {
-    cursor.style.transform = `translate(${e.clientX - 10}px, ${e.clientY - 10}px)`;
-    trail.style.transform = `translate(${e.clientX - 4}px, ${e.clientY - 4}px)`;
+    customCursor.style.left = e.clientX + 'px';
+    customCursor.style.top = e.clientY + 'px';
+    neonPoints.push({ x: e.clientX, y: e.clientY, life: 1 });
+    if (neonPoints.length > 25) neonPoints.shift();
+    document.body.classList.remove('cursor-hidden');
+    clearTimeout(cursorTimeout);
+    cursorTimeout = setTimeout(() => document.body.classList.add('cursor-hidden'), 3000);
 });
+
+function animateNeon() {
+    neonCtx.clearRect(0, 0, neonCanvas.width, neonCanvas.height);
+    neonPoints.forEach(p => { p.life -= 0.06; });
+    neonPoints = neonPoints.filter(p => p.life > 0);
+    if (neonPoints.length > 1) {
+        for (let i = 1; i < neonPoints.length; i++) {
+            neonCtx.beginPath();
+            neonCtx.moveTo(neonPoints[i-1].x, neonPoints[i-1].y);
+            neonCtx.lineTo(neonPoints[i].x, neonPoints[i].y);
+            neonCtx.strokeStyle = `rgba(255, 153, 0, ${neonPoints[i].life})`;
+            neonCtx.lineWidth = 3;
+            neonCtx.shadowColor = '#FF9900';
+            neonCtx.shadowBlur = 10;
+            neonCtx.stroke();
+        }
+    }
+    requestAnimationFrame(animateNeon);
+}
+animateNeon();
 ```
 
 ### 3D Tilt on Hover

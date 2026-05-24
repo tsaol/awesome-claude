@@ -53,6 +53,23 @@ When enhancing existing presentations, viewport fitting is the biggest risk:
 
 ---
 
+## Required Slide Structure
+
+Every deck (slide-deck or rehearsal) MUST include these slides:
+
+| Slide | Position | Purpose |
+|-------|----------|---------|
+| **Cover** | First | Title, subtitle, audience, date/context |
+| **Agenda** | Second | Outline of what the deck covers (3-6 items) |
+| **Takeaway** | Second-to-last | Key points the audience should remember (3-5 bullets) |
+| **Thank You / End** | Last | Closing — "Questions?", contact info, or CTA |
+
+These four slides are non-negotiable. The content slides go between Agenda and Takeaway.
+
+**Minimum deck structure**: Cover → Agenda → [Content slides] → Takeaway → Thank You
+
+---
+
 ## Viewport Fitting Rules
 
 These apply to EVERY slide:
