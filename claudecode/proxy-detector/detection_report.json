@@ -1,0 +1,60 @@
+{
+  "proxy_url": "https://bedrock-runtime.us-west-2.amazonaws.com",
+  "model": "claude-sonnet-4-6-20250514",
+  "score": 3,
+  "max": 10,
+  "percentage": 30.0,
+  "verdict": "LIKELY SWAPPED \u2014 probably NOT the claimed Claude model",
+  "tests": {
+    "Magic String": {
+      "score": 1,
+      "max": 2,
+      "findings": [
+        "Empty/short response to magic string (inconclusive)"
+      ]
+    },
+    "Knowledge Cutoff": {
+      "score": 0,
+      "max": 2,
+      "findings": [
+        "Could not parse cutoff date from response: ''"
+      ]
+    },
+    "Latency & TPS": {
+      "score": 1,
+      "max": 2,
+      "findings": [
+        "Time to first token: 0.32s",
+        "Total time: 0.32s",
+        "Estimated TPS: 0.0 tokens/s",
+        "WARNING: TTFT too fast for sonnet (0.32s < 0.8s minimum)",
+        "  Fast TTFT often indicates a smaller/cheaper model"
+      ]
+    },
+    "Identity & Refusal": {
+      "score": 0,
+      "max": 2,
+      "findings": [
+        "Unclear identity: ''",
+        "Unclear identity: ''"
+      ]
+    },
+    "Tokenizer Signature": {
+      "score": 1,
+      "max": 1,
+      "findings": [
+        "Contains Japanese characters: False",
+        "Contains Romaji in parentheses: False",
+        "Contains Mojibake/encoding errors: False"
+      ]
+    },
+    "Headers & Model Field": {
+      "score": 0,
+      "max": 1,
+      "findings": [
+        "Missing Anthropic headers",
+        "Model field mismatch: requested=claude-sonnet-4-6-20250514, got=unknown"
+      ]
+    }
+  }
+}

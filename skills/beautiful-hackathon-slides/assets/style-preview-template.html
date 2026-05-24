@@ -1,0 +1,264 @@
+<!--
+  Base scaffolding for style previews and final decks.
+
+  This file contains:
+  - The skeleton HTML structure (slides, nav, counter, key hints)
+  - The navigation JS (arrow keys, click halves, nav dots)
+  - Shared CSS utilities (grain texture, animation keyframes, section-label pattern)
+  - A minimal :root CSS variable block to be CUSTOMIZED per style
+
+  When generating a preview or final deck:
+  1. Copy this file as the starting scaffolding.
+  2. REPLACE the :root variables with the chosen preset's colors and fonts.
+  3. ADD slide-specific CSS classes (one per slide type).
+  4. ADD slide-specific HTML blocks (one <div class="slide"> per slide).
+  5. UPDATE the number of nav dots and the counter total.
+
+  Do not deviate from the nav JS or the slide-transition pattern — they are proven.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><Product Name> — <Event Name></title>
+<style>
+  /* ============================================================
+     GOOGLE FONTS — must be customized per chosen style preset.
+
+     The defaults below match "Warm Editorial" and are VALID CSS so
+     the template always renders. If you pick a different preset,
+     replace BOTH the @import URL and the --font-* variables below.
+
+     Copy-paste-ready font blocks for each preset are in
+     `references/style-presets.md` → "Ready-to-paste Font Blocks".
+     ============================================================ */
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,300;1,9..144,400&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  /* ============================================================
+     DESIGN TOKENS — customize per preset
+     Replace color and font values to match the chosen preset.
+     ============================================================ */
+  :root {
+    /* Fonts — defaults match Warm Editorial. Update per preset. */
+    --font-display: 'Fraunces', serif;       /* for h1, h2, section labels */
+    --font-body: 'Outfit', sans-serif;       /* for paragraphs, buttons, UI */
+    --font-mono: 'Space Mono', monospace;    /* optional — only load if using */
+
+    /* Base backgrounds — replace with preset's palette */
+    --bg-primary: #FDF6EC;          /* main slide background */
+    --bg-secondary: #FFF7E0;        /* accent panels */
+    --card-bg: #FFFFFF;             /* cards and surfaces */
+
+    /* Ink (text) */
+    --ink: #1A1714;                 /* primary text */
+    --ink-soft: #3D3730;            /* soft text */
+    --ink-muted: #7A7168;           /* muted / captions */
+
+    /* Primary accent (the signature color) */
+    --accent: #D4920B;
+    --accent-deep: #A36F08;
+    --accent-light: #F5C842;
+    --accent-bg: #FFF7E0;
+    --accent-glow: rgba(212, 146, 11, 0.12);
+
+    /* Secondary accents (2-4 of them) */
+    --accent-2: #E8644A;            /* coral */
+    --accent-2-bg: #FFF0ED;
+    --accent-3: #5A8A6A;            /* sage */
+    --accent-3-bg: #EDF7F0;
+    --accent-4: #7C6BFF;            /* violet */
+    --accent-4-bg: #F0EDFF;
+
+    /* Borders and shadows */
+    --card-border: rgba(26, 23, 20, 0.08);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-md: 0 2px 12px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 24px rgba(0,0,0,0.06);
+  }
+
+  /* ============================================================
+     RESET + BASE
+     ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: clamp(16px, 1.2vw, 20px);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Subtle grain texture for warmth (optional; remove for dark/cyber styles) */
+  .grain {
+    position: fixed; inset: 0;
+    opacity: 0.03;
+    pointer-events: none; z-index: 999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-size: 200px;
+  }
+
+  /* ============================================================
+     SLIDE CONTAINER
+     ============================================================ */
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center;
+    padding: 6vh 8vw;
+    opacity: 0;
+    transition: opacity 0.7s ease;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1; pointer-events: auto;
+  }
+
+  /* ============================================================
+     SHARED ELEMENTS
+     ============================================================ */
+
+  /* Section label — small uppercase callout with colored line */
+  .section-label {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(0.85rem, 1.1vw, 1rem);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2vh;
+    display: flex; align-items: center; gap: 8px;
+    color: var(--accent);
+  }
+  .section-label .line {
+    width: 32px; height: 2px; border-radius: 1px;
+    background: var(--accent);
+  }
+
+  /* H1 and H2 patterns */
+  h1, h2 {
+    font-family: var(--font-display);
+    font-weight: 800;                 /* Many display fonts look thin below 700 — default to bold */
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--ink);
+  }
+
+  /* ============================================================
+     SHARED ANIMATIONS — do not remove
+     ============================================================ */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes slideRight {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ============================================================
+     PER-SLIDE CSS GOES HERE
+     Add a block per slide class: .slide-title, .slide-problem, etc.
+     Reference slide-patterns.md for structures.
+     ============================================================ */
+
+
+  /* ============================================================
+     NAV BAR (dots + counter + key hint) — do not modify
+     ============================================================ */
+  .nav {
+    position: fixed; bottom: 3vh; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 5px; z-index: 100;
+  }
+  .nav-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(26, 23, 20, 0.12);
+    cursor: pointer; transition: all 0.3s ease;
+  }
+  .nav-dot.active {
+    background: var(--accent);
+    width: 22px; border-radius: 4px;
+  }
+  .counter {
+    position: fixed; bottom: 3vh; right: 4vw;
+    font-size: 0.78rem; color: var(--ink-muted); z-index: 100;
+  }
+  .key-hint {
+    position: fixed; top: 3vh; right: 4vw;
+    font-size: 0.68rem; color: var(--ink-muted);
+    opacity: 0.4; z-index: 100;
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<!-- ====================================================
+     SLIDES GO HERE. Add <div class="slide"> blocks.
+     Each slide should:
+     - have class "slide" + one slide-type class (e.g., "slide-title")
+     - have data-index="N" matching its 0-indexed position
+     - first slide should also have class "active"
+     ==================================================== -->
+
+<!-- Example slide 1 (replace with real content):
+<div class="slide slide-title active" data-index="0">
+  <h1>Your Tagline Here</h1>
+</div>
+-->
+
+<!-- ====================================================
+     NAVIGATION — dots, counter, hint
+     Update dots count and counter total when adding/removing slides.
+     ==================================================== -->
+<div class="nav">
+  <div class="nav-dot active" onclick="goTo(0)"></div>
+  <!-- Add one nav-dot per slide, with onclick="goTo(N)" -->
+</div>
+<div class="counter"><span id="current">1</span> / <span id="total">1</span></div>
+<div class="key-hint">← → to navigate</div>
+
+<script>
+  let cur = 0;
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.nav-dot');
+  const total = slides.length;
+
+  // Keep counter's "total" in sync with actual slide count
+  document.getElementById('total').textContent = total;
+
+  function goTo(n) {
+    slides[cur].classList.remove('active');
+    dots[cur].classList.remove('active');
+    cur = (n + total) % total;
+    slides[cur].classList.add('active');
+    dots[cur].classList.add('active');
+    document.getElementById('current').textContent = cur + 1;
+  }
+
+  // Arrow keys + spacebar
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goTo(cur + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(cur - 1); }
+  });
+
+  // Click left/right halves to navigate (but not on nav dots)
+  document.addEventListener('click', e => {
+    if (e.target.closest('.nav')) return;
+    if (e.clientX / window.innerWidth > 0.5) goTo(cur + 1);
+    else goTo(cur - 1);
+  });
+</script>
+</body>
+</html>
