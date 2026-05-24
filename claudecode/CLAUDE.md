@@ -15,10 +15,12 @@
 
 ---
 
+**DO NOT check:** punctuation (missing periods, question marks, commas, wrong marks), spacing, or capitalization. Only check grammar, spelling, word usage, and expression.
+
 When the user communicates, ALWAYS:
 
 1. **STOP** - Before doing anything else, check the user's English
-2. Check if their English is correct (grammar, word usage, and expression)
+2. Check if their English is correct (grammar, word usage, spelling, and expression). Ignore punctuation and capitalization.
 3. If it contains a mix of Chinese and English, or is entirely in Chinese, it is considered an error
 4. Give feedback:
    - If CORRECT: Say "correct." Then log and proceed to execute.
@@ -26,7 +28,7 @@ When the user communicates, ALWAYS:
 5. Suggest Improvements: More natural/idiomatic expressions
 6. Log the check result to ~/english.log using Python (auto-approved):
    ```
-   python3 -c "import datetime; open('/home/ubuntu/english.log', 'a').write(f'[{datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")}] Original: [user\\'s text] | Status: [Correct/Incorrect] | Corrected: [corrected version or N/A] | Idiomatic: [more natural expression] | Explanation: [brief explanation] | Pattern: [key sentence patterns] | Tense: [tense used]\\n')"
+   python3 -c "import datetime, os; open(os.path.expanduser('~/english.log'), 'a').write(f'[{datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")}] Original: [user\\'s text] | Status: [Correct/Incorrect] | Corrected: [corrected version or N/A] | Idiomatic: [more natural expression] | Explanation: [brief explanation] | Pattern: [key sentence patterns] | Tense: [tense used]\\n')"
    ```
 7. **If CORRECT**: Proceed to answer their question or complete their request
 8. **If INCORRECT**: STOP. Do NOT proceed. Ask the user to re-input in correct English. Repeat until correct.
@@ -53,6 +55,8 @@ Example format when INCORRECT (warm / friendly emoji theme, no numeric labels):
 🧩 [以及关键的句型]
 
 ⏰ [这句话用的什么时态]
+
+🔀 [word-order analysis, only when the error involves word order: show "Yours: A B C → English: B A C" and briefly explain why English puts it in that order]
 
 ******* CHECK OVER *********
 
