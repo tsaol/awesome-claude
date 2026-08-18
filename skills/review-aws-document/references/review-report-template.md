@@ -2,9 +2,10 @@
 
 **Reviewer:** {{reviewer}}
 **Date:** {{date}}
-**Authority domain:** {{whose official docs are authoritative — e.g. AWS, Kubernetes, PostgreSQL}}
-**Retrieval method:** {{vendor docs MCP | WebSearch + WebFetch | URL constructed, content confirmed by fetch | repository grep}} — note any rung skipped because the tool was unavailable
+**Source policy:** {{public-only | include-internal}}
+**Retrieval method:** {{AWS Knowledge MCP | web_search + url_fetch (site:docs.aws.amazon.com) | URL constructed, content confirmed by fetch}} — note any tier skipped because the tool was unavailable
 **Coverage:** {{N}} claims extracted, {{N}} verified, {{N}} not checked ({{reason}}). Lifecycle/EOL checked for: {{components}}
+**Retrieval notes:** {{verification detours worth recording even for 🟢/🔴 verdicts — e.g. "limit absent from the Quotas page, found on Constraints"; "EOL inferred from absence in the model catalog, not quoted"; "region claim refuted by one exhaustive list, no second source available"}}
 
 ---
 
@@ -25,7 +26,7 @@ Every claim extracted from the document, with its verdict. Counts here MUST matc
 | ID | Claim | Location | Verdict |
 |---|---|---|---|
 | C1 | _atomic claim as stated in the document_ | _§ heading or line_ | 🔴 Incorrect |
-| C2 | _atomic claim_ | _§ heading or line_ | ✅ Correct |
+| C2 | _atomic claim_ | _§ heading or line_ | 🟢 Correct |
 | C3 | _atomic claim_ | _§ heading or line_ | ⚪ Unverifiable |
 
 ---
@@ -50,7 +51,7 @@ _Keep this heading even when empty; write `_None._` under it._
 
 _Keep this heading even when empty; write `_None._` under it._
 
-### 1. [{{Imprecise | Wrong source | Scope-mismatched}}] {{title}}
+### 1. [{{Imprecise | Wrong source | Region-specific}}] {{title}}
 
 **Claim:** {{C4}} — _quote from document_
 
@@ -72,13 +73,13 @@ Claims that no authoritative source settled. These are findings, not passes. Kee
 
 **Searched:** _which pages and search terms were tried, and what came back_
 
-**Why unresolved:** _no official page covers it / sources ambiguous / no vendor docs exist for this system_
+**Why unresolved:** _no AWS page covers it / official sources ambiguous / preview feature with incomplete docs / outside AWS scope — not checked_
 
-**Action:** _who or what can settle it — config path to read, team to ask, or drop the number and keep the qualitative statement_
+**Action:** _who or what can settle it — the AWS team or account SA to ask, the config to read, or drop the specific number and keep the qualitative statement_
 
 ---
 
-## ✅ Verified Correct
+## 🟢 Verified Correct
 
 - **{{C2}}** _claim_ — [source, section](url)
 
@@ -86,7 +87,7 @@ Claims that no authoritative source settled. These are findings, not passes. Kee
 
 ## Recommendation
 
-**Summary:** _X 🔴, Y 🟡, Z ⚪, W ✅ — total must equal the claim ledger row count_
+**Summary:** _X 🔴, Y 🟡, Z ⚪, W 🟢 — total must equal the claim ledger row count_
 
 **Safe to share:** _which sections stand as-is_
 
