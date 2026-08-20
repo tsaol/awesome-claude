@@ -1,5 +1,5 @@
 ---
-name: review-aws-document
+name: aws-doc-review
 description: >-
   Fact-check AWS technical documents against official AWS documentation. Extracts atomic claims,
   verifies each against docs.aws.amazon.com, reports findings with severity and citations.
@@ -7,7 +7,7 @@ description: >-
   Verification only — never edits the document. AWS content only.
 ---
 
-# Review AWS Document
+# AWS Doc Review
 
 ## Overview
 
