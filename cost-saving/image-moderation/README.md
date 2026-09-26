@@ -2,7 +2,7 @@
 
 **[中文版](README_CN.md)** | English
 
-Cost-optimized image content moderation using Claude's vision capabilities. Combines preprocessing, perceptual hashing, and a tiered model cascade to reduce costs by up to **95%+** compared to naive approaches.
+Cost-optimized image content moderation using Claude's vision capabilities. Combines preprocessing, perceptual hashing, and a tiered model cascade. With the example assumptions in [`examples/cost_comparison.py`](examples/cost_comparison.py), the realtime pipeline costs **~91% less** than sending raw 4K images to Sonnet, and **~96% less** in batch mode. Your numbers depend on your traffic — rerun the script with your own inputs.
 
 ## Architecture
 
@@ -16,253 +16,172 @@ User Upload
        │ no match
        ▼
 ┌──────────────┐
-│  Preprocess  │ ← Resize to 768px, JPEG quality 75 (reduce tokens ~85%)
+│  Preprocess  │ ← EXIF-rotate, flatten alpha, resize to 768px, JPEG q75
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
-│ Claude Haiku │ ← Fast, cheap — handles ~90% of images
+│ Claude Haiku │ ← Haiku 4.5: fast, cheap first pass
 └──────┬───────┘
-       │ low confidence
+       │ confidence < threshold (any verdict), or unparseable/refused/error
        ▼
 ┌───────────────┐
-│ Claude Sonnet │ ← Only for ambiguous cases (~5-10%)
+│ Claude Sonnet │ ← Sonnet 5: second opinion on uncertain cases
 └───────────────┘
+       │ still undetermined
+       ▼
+  needs_review=True, safe=False  (never fails open)
 ```
 
 ## Cost Optimization Strategies
 
 | # | Strategy | Savings | How |
 |---|----------|---------|-----|
-| 1 | Image resizing | ~85% token reduction | 4K→768px reduces tokens from ~8000 to ~1000 |
-| 2 | Prompt caching | ~90% on system prompt | Cache moderation rules across requests |
-| 3 | Tiered cascade | ~90% requests saved | Most images resolved by Haiku or pre-filter |
-| 4 | Batch API | 50% per-request | Non-realtime workloads at half price |
-| 5 | Structured output | ~80% on output tokens | JSON-only response vs. verbose explanation |
-| 6 | Pre-filter (pHash) | 100% for known images | Zero API cost for previously seen violations |
+| 1 | Image resizing | 72–91% fewer image tokens | 4K→768×432 = ~443 tokens vs. 1,568 (Haiku) / 4,784 (Sonnet 5) |
+| 2 | Tiered cascade | Most requests stay on the cheaper model | Haiku first; escalate only low-confidence results |
+| 3 | Batch API | 50% on all tokens | Non-realtime workloads at half price |
+| 4 | Structured output | ~80% on output tokens | JSON-only response (~30 tokens) vs. verbose explanation |
+| 5 | Pre-filter (pHash) | 100% for known images | Zero API cost for previously seen violations |
+| 6 | Prompt caching | **None with the built-in prompt** | Prompt is below the model's minimum cacheable size — see below |
 
-**Combined: ~95%+ total cost reduction**
+### Cost Breakdown (1M images/month, from `examples/cost_comparison.py`)
 
-### Detailed Cost Breakdown (1M images/month, baseline: raw 4K → Sonnet)
+Prices: Haiku 4.5 $1 / $5, Sonnet 5 $2 / $10 per million input / output tokens. The traffic numbers (4K 16:9 uploads, ~320 prompt tokens, 150 verbose vs. 30 JSON output tokens, 10% escalation, 5% pHash hit rate) are **hypothetical inputs**, not measurements.
 
-| # | Strategy | Before | After | Savings | Monthly Cost Impact |
-|---|----------|--------|-------|---------|-------------------|
-| 1 | **Image resizing** (4K→768px) | ~8,000 input tokens/image | ~1,000 input tokens/image | **85% fewer input tokens** | $18,000 → $2,250 (-$15,750) |
-| 2 | **Prompt caching** (system prompt) | 500 tokens @ $3.00/M (Sonnet) | 500 tokens @ $0.30/M (cache hit) | **90% cheaper on system prompt** | $1,500 → $150 (-$1,350) |
-| 3 | **Tiered cascade** (Haiku first) | 1M images × Sonnet ($3.00/M input) | 900K × Haiku ($0.80/M) + 100K × Sonnet ($3.00/M) | **~70% cheaper per-request avg** | $3,000 → $1,020 (-$1,980) |
-| 4 | **Batch API** (async 50% off) | Standard API pricing | 50% discount on all tokens | **50% off entire bill** | $1,020 → $510 (-$510) |
-| 5 | **Structured output** (JSON only) | ~150 output tokens @ $15.00/M (Sonnet) | ~20 output tokens @ $4.00/M (Haiku) | **96% cheaper on output** | $2,250 → $80 (-$2,170) |
-| 6 | **pHash pre-filter** (known images) | 100% images hit API | ~90% images hit API (10% filtered free) | **10% fewer API calls** | Removes ~$50-100 at pipeline level |
+| # | Step | Tokens / image | Monthly cost | vs. naive |
+|---|------|---------------|-------------|-----------|
+| 1 | Naive: raw 4K → Sonnet 5, verbose output | 5,104 in / 150 out | $11,708 | — |
+| 2 | Resize to 768px → Sonnet 5 | 763 in / 150 out | $3,026 | -74.2% |
+| 3 | Resize → Haiku 4.5, JSON-only output | 763 in / 30 out | $913 | -92.2% |
+| 4 | Prompt caching | — | $0 saved | — |
+| 5 | Cascade: Haiku + 10% escalated to Sonnet | | $1,096 | -90.6% |
+| 6 | + pHash pre-filter (5% free) | | **$1,041** | **-91.1%** |
+| 7 | Batch API, Haiku only (non-realtime) | | **$434** | **-96.3%** |
 
-> **Note:** Rows are not strictly additive — strategies compound. The table shows the isolated impact of each technique. When combined sequentially, total cost drops from **~$18,000 to ~$33/month**.
-
-### Strategy-by-Strategy Cost Waterfall
-
-```
-$18,000  ← Baseline: raw 4K images → Sonnet, verbose output
-   │
-   │  [1] Image resizing (4K → 768px)         -85% input tokens
-   ▼
- $2,700
-   │
-   │  [2] Switch to Haiku + prompt caching     -73% model cost + cached system prompt
-   ▼
-   $730
-   │
-   │  [3] Tiered cascade (only 10% → Sonnet)   -90% Sonnet usage
-   ▼
-   $340
-   │
-   │  [5] Structured output (150→20 tokens)    -87% output tokens
-   ▼
-   $130
-   │
-   │  [6] pHash pre-filter (10% zero-cost)     -10% API calls
-   ▼
-   $117
-   │
-   │  [4] Batch API (50% off remaining)        -50% all tokens
-   ▼
-    $58  ← Final: full pipeline + batch
-```
+Step 5 costs more than step 3 because escalation pays for a second opinion on uncertain images — that's an accuracy spend, not a saving. Batch mode runs a single model with no escalation.
 
 ---
 
-### Strategy 1: Image Resizing (~85% token reduction)
+### Strategy 1: Image Resizing
 
-**Why it works:** Claude's vision API converts images into tokens based on pixel count. A 4K image (3840×2160) consumes ~8,000 tokens, while the same image resized to 768×768 uses only ~1,000 tokens. For content moderation, low resolution is sufficient — policy violations (violence, nudity, hate symbols) are visually obvious even at reduced quality.
+**Why it works:** Claude bills images as input tokens, roughly `width × height / 750`. Images larger than the model's limit are first downscaled by the API itself: to 1,568 px on the long edge for Haiku 4.5 (capping an image at ~1,568 tokens) and to 2,576 px for Sonnet 5 (up to ~4,784 tokens). So a raw 4K upload is not "8,000 tokens" — it costs ~1,568 on Haiku and ~4,784 on Sonnet 5. Resizing to 768 px yourself brings it down to a few hundred tokens and shrinks the upload. For moderation, 768 px is usually enough to spot policy violations, but validate on your own data.
 
-**How it saves money:** Image tokens are billed as input tokens. By reducing from ~8,000 to ~1,000 tokens per image, you cut 85% of the per-image input cost. At scale (1M images/month), this alone saves thousands of dollars.
+**Token count by resolution** (`estimate_image_tokens`):
 
-**Token count by resolution:**
+| Resolution | Haiku 4.5 | Sonnet 5 |
+|-----------|-----------|----------|
+| 200×200 | ~54 | ~54 |
+| 400×400 | ~214 | ~214 |
+| 768×432 | ~443 | ~443 |
+| 768×768 | ~787 | ~787 |
+| 1080×1920 | ~1,568 (downscaled) | ~2,765 (downscaled) |
+| 3840×2160 (4K) | ~1,568 (downscaled) | ~4,784 (downscaled) |
 
-| Resolution | Pixels | Estimated Tokens |
-|-----------|--------|-----------------|
-| 200×200 | 40K | ~170 |
-| 400×400 | 160K | ~680 |
-| 768×768 | 590K | ~1,000 |
-| 1080×1920 | 2M | ~2,700 |
-| 3840×2160 (4K) | 8.3M | ~8,000+ |
-
-**Implementation:** We resize to `max_size=768` and compress to JPEG quality 75. We also strip EXIF metadata and convert RGBA→RGB to avoid unnecessary overhead.
+**Implementation:** `preprocess_image` applies EXIF orientation, flattens transparent images (RGBA/LA/P) onto white, resizes to `max_size=768`, and re-encodes as JPEG quality 75 (which also strips EXIF metadata).
 
 ```python
 from image_moderation import preprocess_image
 
 b64, meta = preprocess_image("photo_4k.jpg", max_size=768, quality=75)
 print(meta)
-# {'original_size': (3840, 2160), 'final_size': (768, 432),
-#  'bytes_original': 4200000, 'bytes_compressed': 85000,
-#  'estimated_tokens': 1000}
+# {'original_size': (3840, 2160), 'final_size': (768, 432), ...,
+#  'estimated_tokens': 443, 'estimated_tokens_original': 1568}
 ```
 
 ---
 
-### Strategy 2: Prompt Caching (~90% savings on system prompt tokens)
+### Strategy 2: Tiered Cascade
 
-**Why it works:** Every moderation request sends the same system prompt — the moderation rules, category definitions, and output format instructions. Without caching, you pay full price for these tokens on every single request. Anthropic's prompt caching stores the system prompt server-side and reuses it across requests, charging only 10% of the normal input token rate for cache hits.
+**Why it works:** Most images are easy. A cheaper model handles them; only uncertain ones go to the more capable model.
 
-**How it saves money:** A typical moderation system prompt is 500-1,000 tokens. With 1M requests/month, that's 500M-1B tokens just for the system prompt. At Haiku's input price ($0.80/M tokens), that's $400-800/month. With caching, cache hits cost $0.08/M tokens — reducing this to $40-80/month.
+| Cascade Level | Cost per Image (example) | Purpose |
+|--------------|---------------|---------|
+| pHash pre-filter | $0 | Known violations matched by hash |
+| Claude Haiku 4.5 | ~$0.0009 | First pass on everything else |
+| Claude Sonnet 5 | ~$0.0018 (plus the Haiku call already paid) | Second opinion on uncertain cases |
 
-**Cache hit rate:** In a production moderation pipeline with steady traffic, cache hit rates typically exceed 95%, because the system prompt rarely changes.
-
-```python
-# Caching is enabled by default in the pipeline.
-# The system prompt gets cache_control: {"type": "ephemeral"}
-# which tells Anthropic to cache it for ~5 minutes.
-#
-# With steady request flow, nearly every request hits the cache.
-
-pipeline = ImageModerationPipeline(enable_cache=True)  # default
-
-# Check cache performance in results:
-result = pipeline.moderate("image.jpg")
-print(f"Cached tokens: {result.cached_tokens}")  # e.g., 500 out of 1500 input tokens
-```
-
----
-
-### Strategy 3: Tiered Cascade (~90% cost reduction through routing)
-
-**Why it works:** Not all images need the same level of analysis. Most images are obviously safe or obviously unsafe — only a small fraction are genuinely ambiguous. By using cheaper models (or no model at all) for easy cases, and only escalating to expensive models for hard cases, you dramatically reduce average cost per image.
-
-**How it saves money:**
-
-| Cascade Level | Cost per Image | Traffic Share | Purpose |
-|--------------|---------------|--------------|---------|
-| pHash pre-filter | $0 | ~5-10% | Known violations matched by hash |
-| Claude Haiku | ~$0.001 | ~85-90% | Fast, cheap — handles most cases |
-| Claude Sonnet | ~$0.005 | ~5-10% | High accuracy for ambiguous content |
-
-If 90% of images are handled by Haiku at $0.001 and only 10% escalate to Sonnet at $0.005, the blended average is $0.0014/image instead of $0.005/image (Sonnet for all) — a 72% savings on Claude API costs alone.
-
-**Escalation logic:** When Haiku returns a result with confidence below the `sonnet_threshold` (default: 0.7), the image automatically escalates to Sonnet for a second opinion. Safe images with high confidence never escalate.
+**Escalation logic:** If Haiku's confidence is below `sonnet_threshold` (default 0.7) — whether it said safe or unsafe — or its reply couldn't be used (unparseable, refusal, API error), the image goes to Sonnet. If no level can decide, the result is `needs_review=True` with `safe=False`, and is counted in `stats["needs_review"]`. The pipeline never reports an unchecked image as safe.
 
 ```python
 pipeline = ImageModerationPipeline(
-    sonnet_threshold=0.7,  # escalate if Haiku confidence < 70%
+    sonnet_threshold=0.7,
     cascade_levels=["phash", "haiku", "sonnet"],
 )
 
-# After processing, check where images were resolved:
 print(pipeline.stats)
-# {'total': 10000, 'resolved_at': {'phash': 500, 'haiku': 8600, 'sonnet': 900}, ...}
+# {'total': 10000, 'resolved_at': {'phash': 500, 'haiku': 8600, 'sonnet': 900, ...},
+#  'escalated': 900, 'needs_review': 12, 'total_cost': ..., ...}
 ```
+
+`total_cost` includes the Haiku calls for escalated images.
 
 ---
 
-### Strategy 4: Batch API (50% cost reduction)
+### Strategy 3: Batch API (50% cost reduction)
 
-**Why it works:** Anthropic's Message Batches API offers a 50% discount on all token costs in exchange for asynchronous processing. Instead of getting results in real-time, you submit a batch and receive results within 24 hours. For moderation workflows that don't need instant results — such as nightly review of user-uploaded content, backlog audits, or periodic sweeps — this is free money.
+**Why it works:** The Message Batches API bills all tokens (input, output, cache reads/writes) at 50% in exchange for asynchronous processing (results within 24 hours). Good for nightly sweeps, backlog audits, and re-moderation after policy changes; not for realtime upload checks.
 
-**How it saves money:** The 50% discount applies to all tokens (input, output, and cached). This stacks with all other optimizations. If your optimized per-image cost is $0.001, Batch API brings it to $0.0005.
-
-**When to use it:**
-- Nightly/weekly content review sweeps
-- Backlog moderation of existing content
-- Re-moderation after policy updates
-- Training data labeling
-
-**When NOT to use it:**
-- Real-time upload moderation (users expect instant feedback)
-- Live-stream content filtering
+Batch mode uses one model (Haiku if enabled, else Sonnet) with no escalation. Every submitted image gets a result: failed or expired requests come back as `needs_review` results. Each result carries `details["custom_id"]` (`img_<index>` in submission order).
 
 ```python
+import time
 from pathlib import Path
 
-images = list(Path("uploads/today/").glob("*.jpg"))
-batch_id = pipeline.moderate_batch_async(images)  # returns immediately
-print(f"Submitted {len(images)} images, batch ID: {batch_id}")
+images = sorted(Path("uploads/today/").glob("*.jpg"))
+batch_id = pipeline.moderate_batch_async(images)
 
-# Hours later, retrieve results:
+while pipeline.get_batch_status(batch_id) != "ended":
+    time.sleep(60)
+
 results = pipeline.get_batch_results(batch_id)
-flagged = [r for r in results if not r.safe]
-print(f"Flagged: {len(flagged)}/{len(results)}")
+flagged = [r for r in results if not r.safe]   # includes needs_review
 ```
 
 ---
 
-### Strategy 5: Structured Output (~80% savings on output tokens)
+### Strategy 4: Structured Output (~80% savings on output tokens)
 
-**Why it works:** Output tokens are significantly more expensive than input tokens across all Claude models:
+Output tokens cost 5× input tokens on both models (Haiku 4.5: $1 / $5, Sonnet 5: $2 / $10 per MTok). A verbose explanation easily takes 100–200 output tokens; the JSON verdict takes ~30. The system prompt asks for JSON only and `max_tokens=100` caps runaway replies. On Sonnet 5, thinking is explicitly disabled for this short classification.
 
-| Model | Input Price | Output Price | Output/Input Ratio |
-|-------|-----------|-------------|-------------------|
-| Haiku | $0.80/M | $4.00/M | **5x** |
-| Sonnet | $3.00/M | $15.00/M | **5x** |
-
-A verbose moderation response ("This image appears to contain graphic violence depicting...") can easily consume 100-200 output tokens. A structured JSON response (`{"safe": false, "category": "violence", "confidence": 0.95}`) uses only ~20 tokens — an 80-90% reduction.
-
-**How it saves money:** For 1M images on Haiku, reducing output from 150 to 20 tokens saves:
-- Before: 150M output tokens × $4.00/M = $600/month
-- After: 20M output tokens × $4.00/M = $80/month
-- **Savings: $520/month** just from output compression
-
-**Implementation:** The system prompt explicitly instructs Claude to respond with JSON only, and `max_tokens` is set to 100 (a safety margin — actual responses are ~20 tokens).
-
-```python
-# The client enforces structured output:
-# - System prompt: "Respond with ONLY a JSON object, no other text"
-# - max_tokens=100 (prevents runaway responses)
-# - Response format: {"safe": bool, "category": str, "confidence": float, "reason": str}
-```
+Replies are parsed defensively: code fences are stripped, unknown categories map to `other`, confidence is clamped to [0, 1], and anything that isn't a JSON object with a boolean `safe` becomes a `needs_review` result.
 
 ---
 
-### Strategy 6: Pre-filter with Perceptual Hashing (100% savings for known images)
+### Strategy 5: Pre-filter with Perceptual Hashing (100% savings for known images)
 
-**Why it works:** Perceptual hashing (pHash) generates a fingerprint of an image's visual content that is robust to resizing, compression, and minor edits. By maintaining a database of hashes from previously identified violations, you can instantly match re-uploads and near-duplicates without ever calling the Claude API.
+Perceptual hashing (pHash) fingerprints visual content and is robust to resizing, re-encoding, and small edits. Re-uploads of known violations match for free.
 
-**How it saves money:** Every image matched by pHash costs exactly $0 in API calls. In platforms where users re-upload the same violating content (common in spam/abuse scenarios), this can filter out 5-20% of all images for free.
-
-**How it handles variants:** Unlike exact file hashes (MD5/SHA), pHash compares visual similarity. Two images that are:
-- Different file formats (JPEG vs PNG) → same pHash
-- Different resolutions → same pHash
-- Slightly cropped or color-adjusted → similar pHash (within threshold)
-
-The `threshold` parameter (default: 8) controls strictness. Lower = stricter matching, fewer false positives. Higher = more lenient, catches more variants but risks false positives.
+The `threshold` parameter (default: 8, Hamming distance out of 64 bits) controls strictness. Malformed rows in the hash CSV are skipped with a warning.
 
 ```python
 from image_moderation.prefilter import PHashFilter
 from image_moderation.models import ModerationCategory
 
-# Build a hash database from confirmed violations
 phash = PHashFilter()
 phash.add_hash(phash.compute_hash("known_spam_1.jpg"), ModerationCategory.SPAM)
-phash.add_hash(phash.compute_hash("known_violence_1.jpg"), ModerationCategory.VIOLENCE)
-phash.save_db("known_violations.csv")
+phash.save_db("known_violations.csv")   # hash,category per line
 
-# In production, matches are instant and free:
 result = phash.check("user_upload.jpg", threshold=8)
 if result:
     print(f"Matched known violation: {result.category} (confidence: {result.confidence})")
 ```
 
+---
+
+### Strategy 6: Prompt Caching (does not apply to the built-in prompt)
+
+The client marks the system prompt with `cache_control`, but the API only caches a prefix that meets the model's minimum: **4,096 tokens on Haiku 4.5** and **1,024 tokens on Sonnet 5**. The built-in prompt is ~300 tokens, so nothing is cached and `cached_tokens` stays 0. The marker is harmless. The image itself is unique per request and can never be cached.
+
+If you replace the prompt with a long policy document above the minimum, cache reads are billed at 0.1× input price and cache writes at 1.25×. Check `result.cached_tokens` (`cache_read_input_tokens`) to confirm hits.
+
 ## Quick Start
 
+Requires Python 3.9+.
+
 ```bash
-cd skills/image-moderation
-pip install -e .
+cd cost-saving/image-moderation
+pip install -e '.[dev]'
+pytest -q        # unit tests, no API calls
 ```
 
 ### Single Image
@@ -270,45 +189,22 @@ pip install -e .
 ```python
 from image_moderation import ImageModerationPipeline
 
-pipeline = ImageModerationPipeline(
-    enable_cache=True,
-    max_image_size=768,
-    sonnet_threshold=0.7,
-)
+pipeline = ImageModerationPipeline(max_image_size=768, sonnet_threshold=0.7)
 
 result = pipeline.moderate("photo.jpg")
-print(result.safe)          # True/False
-print(result.category)      # ModerationCategory.SAFE
-print(result.cost_summary)  # Level: haiku | Tokens: 1050in/25out (500 cached) | Cost: $0.000640
-```
-
-### Batch Processing (50% cheaper)
-
-```python
-from pathlib import Path
-
-images = list(Path("uploads/").glob("*.jpg"))
-batch_id = pipeline.moderate_batch_async(images)
-
-# Poll later (Batch API returns within 24h)
-results = pipeline.get_batch_results(batch_id)
-flagged = [r for r in results if not r.safe]
+print(result.safe, result.needs_review)   # True/False, True if a human should look
+print(result.category)                    # ModerationCategory.SAFE
+print(result.cost_summary)
+# Level: haiku | Tokens: 770in/28out (0 cache read, 0 cache write) | Cost: $0.000910
 ```
 
 ### With pHash Pre-filter
 
 ```python
 pipeline = ImageModerationPipeline(
-    hash_db_path="known_violations.csv",  # hash,category per line
-    cascade_levels=["phash", "haiku", "sonnet"],
+    hash_db_path="known_violations.csv",
+    cascade_levels=["phash", "haiku", "sonnet"],   # "prefilter" is accepted as an alias of "phash"
 )
-
-# Build the hash database over time
-from image_moderation.prefilter import PHashFilter
-phash = PHashFilter()
-h = phash.compute_hash("confirmed_violation.jpg")
-phash.add_hash(h, ModerationCategory.VIOLENCE)
-phash.save_db("known_violations.csv")
 ```
 
 ## Configuration
@@ -317,38 +213,39 @@ phash.save_db("known_violations.csv")
 |-----------|---------|-------------|
 | `max_image_size` | 768 | Max dimension for resize (lower = cheaper) |
 | `image_quality` | 75 | JPEG compression quality |
-| `sonnet_threshold` | 0.7 | Confidence below this triggers Sonnet escalation |
-| `enable_cache` | True | Cache system prompt for 90% token savings |
-| `cascade_levels` | all | Which levels to enable: `phash`, `haiku`, `sonnet` |
+| `sonnet_threshold` | 0.7 | Haiku confidence below this (any verdict) triggers Sonnet |
+| `enable_cache` | True | Add `cache_control` to the system prompt (only effective above the model's minimum prompt size) |
+| `cascade_levels` | all | Any of `phash` (alias `prefilter`), `haiku`, `sonnet`; unknown names raise `ValueError` |
+| `client` | None | Pre-built `anthropic.Anthropic`-compatible client (useful for tests) |
 
 ## Cost Estimation
-
-Run the cost comparison script:
 
 ```bash
 python examples/cost_comparison.py
 ```
 
-Example output for **1M images/month**:
+Edit the hypothetical inputs at the top of the script (image size, escalation rate, pHash hit rate, output length) to match your traffic. With the defaults:
 
-| Strategy | Monthly Cost |
+| Strategy | Monthly Cost (1M images) |
 |----------|-------------|
-| Naive (raw → Sonnet) | ~$18,000 |
-| Resized → Haiku | ~$1,000 |
-| Full pipeline + Batch | ~$50 |
+| Naive (raw 4K → Sonnet 5) | ~$11,700 |
+| Resized → Haiku 4.5 | ~$913 |
+| Full realtime pipeline | ~$1,041 |
+| Batch, Haiku only | ~$434 |
 
 ## Project Structure
 
 ```
 image_moderation/
 ├── __init__.py          # Public API
-├── models.py            # Data models, enums, cost estimation
-├── preprocessing.py     # Image resize/compress/encode
+├── models.py            # Data models, enums, pricing, cost estimation
+├── preprocessing.py     # Image orient/flatten/resize/encode + token estimate
 ├── prefilter.py         # pHash matching against known violations
-├── client.py            # Claude API wrapper (cache + batch)
+├── client.py            # Claude API wrapper (parsing, errors, batch)
 └── pipeline.py          # Tiered cascade orchestrator
 examples/
 ├── basic_moderation.py  # Single image example
-├── batch_moderation.py  # Batch API example
-└── cost_comparison.py   # Cost savings calculator
+├── batch_moderation.py  # Batch API example (polls until ended)
+└── cost_comparison.py   # Cost calculator (hypothetical inputs)
+tests/                   # pytest suite with a fake Anthropic client
 ```

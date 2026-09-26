@@ -12,7 +12,7 @@ pipeline = ImageModerationPipeline(
 
 result = pipeline.moderate("test_image.jpg")
 
-print(f"Safe: {result.safe}")
+print(f"Safe: {result.safe}  (needs review: {result.needs_review})")
 print(f"Category: {result.category.value}")
 print(f"Confidence: {result.confidence:.2f}")
 print(f"Cost: {result.cost_summary}")

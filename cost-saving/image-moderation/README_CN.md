@@ -1,8 +1,8 @@
 # 图片内容审核流水线
 
-**English** | [English Version](README.md)
+**中文** | [English](README.md)
 
-基于 Claude 视觉能力的低成本图片内容审核方案。通过图片预处理、感知哈希和分层模型级联，实现 **95%+** 的成本降低。
+基于 Claude 视觉能力的低成本图片内容审核方案。结合图片预处理、感知哈希和分层模型级联。按 [`examples/cost_comparison.py`](examples/cost_comparison.py) 中的示例假设，实时流水线比"原始 4K 图片直接发给 Sonnet"便宜 **~91%**，批量模式便宜 **~96%**。实际数字取决于你的流量 —— 请用自己的参数重新运行脚本。
 
 ## 架构
 
@@ -16,338 +16,236 @@
        │ 未命中
        ▼
 ┌──────────────┐
-│  图片预处理  │ ← 缩放至 768px，JPEG 质量 75（减少 ~85% token）
+│  图片预处理  │ ← EXIF 方向校正、透明背景转白、缩放至 768px、JPEG 质量 75
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
-│ Claude Haiku │ ← 快速、便宜 — 处理 ~90% 的图片
+│ Claude Haiku │ ← Haiku 4.5：快速、便宜的初审
 └──────┬───────┘
-       │ 置信度低
+       │ 置信度低于阈值（无论判定结果），或无法解析/拒绝/出错
        ▼
 ┌───────────────┐
-│ Claude Sonnet │ ← 仅处理模糊案例（~5-10%）
+│ Claude Sonnet │ ← Sonnet 5：对不确定案例复审
 └───────────────┘
+       │ 仍无法判定
+       ▼
+  needs_review=True, safe=False（绝不默认放行）
 ```
 
 ## 降本策略概览
 
 | # | 策略 | 节省幅度 | 实现方式 |
 |---|------|---------|---------|
-| 1 | 图片缩放 | ~85% token 减少 | 4K→768px，token 从 ~8000 降至 ~1000 |
-| 2 | 提示词缓存 | 系统提示词节省 ~90% | 跨请求缓存审核规则 |
-| 3 | 分层级联 | ~90% 请求节省 | 大部分图片由 Haiku 或预过滤解决 |
-| 4 | 批量 API | 每请求节省 50% | 非实时任务半价处理 |
-| 5 | 结构化输出 | 输出 token 节省 ~80% | JSON 响应 vs 冗长文本 |
-| 6 | 预过滤（pHash） | 已知图片节省 100% | 已见过的违规图片零 API 成本 |
+| 1 | 图片缩放 | 图片 token 减少 72–91% | 4K→768×432 ≈ 443 token，对比 1,568（Haiku）/ 4,784（Sonnet 5） |
+| 2 | 分层级联 | 大部分请求停留在便宜模型 | Haiku 优先，仅低置信度结果升级 |
+| 3 | 批量 API | 所有 token 5 折 | 非实时任务半价处理 |
+| 4 | 结构化输出 | 输出 token 节省 ~80% | 纯 JSON 响应（~30 token）vs 冗长文本 |
+| 5 | 预过滤（pHash） | 已知图片节省 100% | 已见过的违规图片零 API 成本 |
+| 6 | 提示词缓存 | **内置提示词下无效果** | 提示词低于模型最小可缓存长度，见下文 |
 
-**组合使用：总成本降低 ~95%+**
+### 成本明细（100 万张/月，来自 `examples/cost_comparison.py`）
 
-### 详细成本对照表（基准：100 万张/月，原始 4K → Sonnet）
+价格：Haiku 4.5 输入/输出 $1 / $5，Sonnet 5 $2 / $10（每百万 token）。流量参数（4K 16:9 上传、~320 提示词 token、冗长输出 150 vs JSON 输出 30 token、10% 升级率、5% pHash 命中率）均为**假设输入**，并非实测数据。
 
-| # | 策略 | 优化前 | 优化后 | 节省幅度 | 月成本影响 |
-|---|------|-------|-------|---------|-----------|
-| 1 | **图片缩放**（4K→768px） | ~8,000 输入 token/张 | ~1,000 输入 token/张 | **减少 85% 输入 token** | $18,000 → $2,250（-$15,750） |
-| 2 | **提示词缓存**（系统提示词） | 500 token @ $3.00/M（Sonnet） | 500 token @ $0.30/M（缓存命中） | **系统提示词便宜 90%** | $1,500 → $150（-$1,350） |
-| 3 | **分层级联**（Haiku 优先） | 100 万张 × Sonnet（$3.00/M 输入） | 90 万 × Haiku（$0.80/M）+ 10 万 × Sonnet（$3.00/M） | **平均每请求便宜 ~70%** | $3,000 → $1,020（-$1,980） |
-| 4 | **批量 API**（异步 5 折） | 标准 API 定价 | 所有 token 5 折 | **整体账单 5 折** | $1,020 → $510（-$510） |
-| 5 | **结构化输出**（纯 JSON） | ~150 输出 token @ $15.00/M（Sonnet） | ~20 输出 token @ $4.00/M（Haiku） | **输出成本降低 96%** | $2,250 → $80（-$2,170） |
-| 6 | **pHash 预过滤**（已知图片） | 100% 图片调用 API | ~90% 图片调用 API（10% 免费过滤） | **减少 10% API 调用** | 在流水线层面节省 ~$50-100 |
+| # | 步骤 | 每张 token | 月成本 | 对比基准 |
+|---|------|-----------|-------|---------|
+| 1 | 基准：原始 4K → Sonnet 5，冗长输出 | 输入 5,104 / 输出 150 | $11,708 | — |
+| 2 | 缩放至 768px → Sonnet 5 | 输入 763 / 输出 150 | $3,026 | -74.2% |
+| 3 | 缩放 → Haiku 4.5，纯 JSON 输出 | 输入 763 / 输出 30 | $913 | -92.2% |
+| 4 | 提示词缓存 | — | 节省 $0 | — |
+| 5 | 级联：Haiku + 10% 升级到 Sonnet | | $1,096 | -90.6% |
+| 6 | + pHash 预过滤（5% 免费） | | **$1,041** | **-91.1%** |
+| 7 | 批量 API，仅 Haiku（非实时） | | **$434** | **-96.3%** |
 
-> **注意：** 各行并非简单相加 — 策略之间是复合叠加关系。上表展示的是每个技术的独立影响。顺序组合后，总成本从 **~$18,000 降至 ~$33/月**。
-
-### 逐策略成本瀑布图
-
-```
-$18,000  ← 基准：原始 4K 图片 → Sonnet，冗长输出
-   │
-   │  [1] 图片缩放（4K → 768px）             -85% 输入 token
-   ▼
- $2,700
-   │
-   │  [2] 切换 Haiku + 提示词缓存            -73% 模型成本 + 缓存系统提示词
-   ▼
-   $730
-   │
-   │  [3] 分层级联（仅 10% → Sonnet）         -90% Sonnet 使用量
-   ▼
-   $340
-   │
-   │  [5] 结构化输出（150→20 token）          -87% 输出 token
-   ▼
-   $130
-   │
-   │  [6] pHash 预过滤（10% 零成本）          -10% API 调用
-   ▼
-   $117
-   │
-   │  [4] 批量 API（剩余部分 5 折）           -50% 所有 token
-   ▼
-    $58  ← 最终：完整流水线 + 批量处理
-```
+第 5 步比第 3 步贵，因为升级是为不确定图片多付一次复审费用 —— 这是为准确率花钱，不是省钱。批量模式只运行单个模型，没有升级。
 
 ---
 
-### 策略 1：图片缩放（减少 ~85% token）
+### 策略 1：图片缩放
 
-**原理：** Claude 的视觉 API 根据像素数量将图片转换为 token。一张 4K 图片（3840×2160）消耗 ~8,000 个 token，而缩放到 768×768 后仅需 ~1,000 个 token。对于内容审核来说，低分辨率完全够用 — 违规内容（暴力、色情、仇恨符号）在低分辨率下同样一目了然。
+**原理：** Claude 将图片按输入 token 计费，约为 `宽 × 高 / 750`。超过模型上限的图片会先由 API 自动缩小：Haiku 4.5 长边缩到 1,568 px（单张上限约 1,568 token），Sonnet 5 长边缩到 2,576 px（最多约 4,784 token）。所以原始 4K 图片并不是"8,000 token" —— 在 Haiku 上约 1,568，在 Sonnet 5 上约 4,784。自己先缩放到 768 px 可降到几百 token，并减小上传体积。768 px 通常足以识别违规内容，但请用自己的数据验证。
 
-**省钱机制：** 图片 token 按输入 token 计费。每张图从 ~8,000 降到 ~1,000 token，直接砍掉 85% 的单图输入成本。按 100 万张/月计算，仅此一项就能节省数千美元。
+**不同分辨率的 token 数**（`estimate_image_tokens`）：
 
-**不同分辨率的 token 消耗：**
+| 分辨率 | Haiku 4.5 | Sonnet 5 |
+|-------|-----------|----------|
+| 200×200 | ~54 | ~54 |
+| 400×400 | ~214 | ~214 |
+| 768×432 | ~443 | ~443 |
+| 768×768 | ~787 | ~787 |
+| 1080×1920 | ~1,568（已缩小） | ~2,765（已缩小） |
+| 3840×2160（4K） | ~1,568（已缩小） | ~4,784（已缩小） |
 
-| 分辨率 | 像素数 | 预估 Token 数 |
-|--------|-------|-------------|
-| 200×200 | 4 万 | ~170 |
-| 400×400 | 16 万 | ~680 |
-| 768×768 | 59 万 | ~1,000 |
-| 1080×1920 | 200 万 | ~2,700 |
-| 3840×2160（4K） | 830 万 | ~8,000+ |
-
-**实现方式：** 缩放至 `max_size=768`，JPEG 压缩质量 75，同时去除 EXIF 元数据并将 RGBA 转为 RGB。
+**实现：** `preprocess_image` 会应用 EXIF 方向、将透明图片（RGBA/LA/P）合成到白色背景、缩放至 `max_size=768`，并重新编码为 JPEG 质量 75（同时去除 EXIF 元数据）。
 
 ```python
 from image_moderation import preprocess_image
 
 b64, meta = preprocess_image("photo_4k.jpg", max_size=768, quality=75)
 print(meta)
-# {'original_size': (3840, 2160), 'final_size': (768, 432),
-#  'bytes_original': 4200000, 'bytes_compressed': 85000,
-#  'estimated_tokens': 1000}
+# {'original_size': (3840, 2160), 'final_size': (768, 432), ...,
+#  'estimated_tokens': 443, 'estimated_tokens_original': 1568}
 ```
 
 ---
 
-### 策略 2：提示词缓存（系统提示词节省 ~90%）
+### 策略 2：分层级联
 
-**原理：** 每次审核请求都会发送相同的系统提示词 — 审核规则、分类定义和输出格式说明。不开缓存的话，每次请求都要为这些 token 付全价。Anthropic 的提示词缓存将系统提示词存储在服务端并跨请求复用，缓存命中时仅收取正常输入 token 费率的 10%。
+**原理：** 大多数图片很容易判断，由便宜模型处理；只有不确定的才交给更强的模型。
 
-**省钱机制：** 典型审核系统提示词为 500-1,000 个 token。100 万次请求/月，仅系统提示词就是 5 亿到 10 亿 token。按 Haiku 输入价格（$0.80/百万 token）计算，这就是 $400-800/月。开启缓存后，缓存命中价格为 $0.08/百万 token — 降至 $40-80/月。
+| 级联层级 | 每张成本（示例） | 用途 |
+|---------|---------------|------|
+| pHash 预过滤 | $0 | 通过哈希匹配已知违规 |
+| Claude Haiku 4.5 | ~$0.0009 | 其余所有图片的初审 |
+| Claude Sonnet 5 | ~$0.0018（另加已付的 Haiku 调用） | 不确定案例的复审 |
 
-**缓存命中率：** 在流量稳定的生产环境审核流水线中，缓存命中率通常超过 95%，因为系统提示词几乎不变。
-
-```python
-# 流水线默认启用缓存。
-# 系统提示词设置 cache_control: {"type": "ephemeral"}
-# 告诉 Anthropic 缓存约 5 分钟。
-# 流量稳定时，几乎每个请求都命中缓存。
-
-pipeline = ImageModerationPipeline(enable_cache=True)  # 默认值
-
-# 在结果中查看缓存表现：
-result = pipeline.moderate("image.jpg")
-print(f"缓存 token 数: {result.cached_tokens}")  # 例如 1500 个输入 token 中有 500 个命中缓存
-```
-
----
-
-### 策略 3：分层级联（通过路由降低 ~90% 成本）
-
-**原理：** 不是所有图片都需要同等级别的分析。大部分图片要么明显安全、要么明显违规 — 只有少部分真正模糊不清。对简单案例使用更便宜的模型（甚至不用模型），只对难判断的案例升级到贵模型，就能大幅降低平均单图成本。
-
-**省钱机制：**
-
-| 级联层级 | 单图成本 | 流量占比 | 用途 |
-|---------|---------|---------|------|
-| pHash 预过滤 | $0 | ~5-10% | 哈希匹配已知违规图片 |
-| Claude Haiku | ~$0.001 | ~85-90% | 快速、便宜 — 处理大部分案例 |
-| Claude Sonnet | ~$0.005 | ~5-10% | 高精度处理模糊内容 |
-
-如果 90% 的图片由 Haiku 以 $0.001 处理，只有 10% 升级到 Sonnet 以 $0.005 处理，混合平均成本为 $0.0014/张，而非全部用 Sonnet 的 $0.005/张 — 仅 Claude API 成本就节省 72%。
-
-**升级逻辑：** 当 Haiku 返回的结果置信度低于 `sonnet_threshold`（默认 0.7）时，图片自动升级到 Sonnet 进行二次判断。高置信度的安全图片永远不会升级。
+**升级逻辑：** 如果 Haiku 的置信度低于 `sonnet_threshold`（默认 0.7）—— 无论判定为安全还是不安全 —— 或者回复无法使用（无法解析、拒绝、API 错误），图片会升级到 Sonnet。如果所有层级都无法判定，结果为 `needs_review=True` 且 `safe=False`，并计入 `stats["needs_review"]`。流水线绝不会把未审核的图片报告为安全。
 
 ```python
 pipeline = ImageModerationPipeline(
-    sonnet_threshold=0.7,  # Haiku 置信度 < 70% 时升级
+    sonnet_threshold=0.7,
     cascade_levels=["phash", "haiku", "sonnet"],
 )
 
-# 处理后查看图片在哪一层被解决：
 print(pipeline.stats)
-# {'total': 10000, 'resolved_at': {'phash': 500, 'haiku': 8600, 'sonnet': 900}, ...}
+# {'total': 10000, 'resolved_at': {'phash': 500, 'haiku': 8600, 'sonnet': 900, ...},
+#  'escalated': 900, 'needs_review': 12, 'total_cost': ..., ...}
 ```
+
+`total_cost` 包含升级图片的 Haiku 调用费用。
 
 ---
 
-### 策略 4：批量 API（降低 50% 成本）
+### 策略 3：批量 API（成本降低 50%）
 
-**原理：** Anthropic 的 Message Batches API 以异步处理换取所有 token 成本 5 折优惠。提交批量任务后在 24 小时内返回结果，而非实时响应。对于不需要即时结果的审核场景 — 如每晚回顾用户上传内容、历史内容审查或定期巡检 — 这相当于白送的优惠。
+**原理：** Message Batches API 以异步处理（24 小时内返回）换取所有 token（输入、输出、缓存读写）5 折计费。适合夜间巡检、存量审核、策略更新后重审；不适合实时上传审核。
 
-**省钱机制：** 5 折优惠适用于所有 token（输入、输出和缓存）。且与其他所有优化策略叠加。如果优化后的单图成本是 $0.001，批量 API 可以进一步降到 $0.0005。
-
-**适用场景：**
-- 每晚/每周的内容回顾巡检
-- 历史存量内容审核
-- 策略更新后的重新审核
-- 训练数据标注
-
-**不适用场景：**
-- 实时上传审核（用户期望即时反馈）
-- 直播内容过滤
+批量模式只用一个模型（启用 Haiku 时用 Haiku，否则用 Sonnet），没有升级。每张提交的图片都有结果：失败或过期的请求返回 `needs_review` 结果。每个结果带有 `details["custom_id"]`（按提交顺序为 `img_<序号>`）。
 
 ```python
+import time
 from pathlib import Path
 
-images = list(Path("uploads/today/").glob("*.jpg"))
-batch_id = pipeline.moderate_batch_async(images)  # 立即返回
-print(f"已提交 {len(images)} 张图片，批次 ID: {batch_id}")
+images = sorted(Path("uploads/today/").glob("*.jpg"))
+batch_id = pipeline.moderate_batch_async(images)
 
-# 数小时后获取结果：
+while pipeline.get_batch_status(batch_id) != "ended":
+    time.sleep(60)
+
 results = pipeline.get_batch_results(batch_id)
-flagged = [r for r in results if not r.safe]
-print(f"标记违规: {len(flagged)}/{len(results)}")
+flagged = [r for r in results if not r.safe]   # 包含 needs_review
 ```
 
 ---
 
-### 策略 5：结构化输出（输出 token 节省 ~80%）
+### 策略 4：结构化输出（输出 token 节省 ~80%）
 
-**原理：** 在所有 Claude 模型中，输出 token 都比输入 token 贵得多：
+两个模型的输出 token 价格都是输入的 5 倍（Haiku 4.5：$1 / $5，Sonnet 5：$2 / $10 每百万 token）。冗长解释通常需要 100–200 个输出 token，JSON 判定只需 ~30 个。系统提示词要求只输出 JSON，`max_tokens=100` 防止失控输出。在 Sonnet 5 上，此短分类任务显式关闭了 thinking。
 
-| 模型 | 输入价格 | 输出价格 | 输出/输入比 |
-|------|---------|---------|-----------|
-| Haiku | $0.80/M | $4.00/M | **5 倍** |
-| Sonnet | $3.00/M | $15.00/M | **5 倍** |
-
-一个冗长的审核回复（"这张图片似乎包含了描绘暴力场景的内容..."）轻松消耗 100-200 个输出 token。而结构化 JSON 响应（`{"safe": false, "category": "violence", "confidence": 0.95}`）只需 ~20 个 token — 减少 80-90%。
-
-**省钱机制：** 对于 100 万张图片使用 Haiku，将输出从 150 降到 20 个 token：
-- 优化前：1.5 亿输出 token × $4.00/M = $600/月
-- 优化后：2000 万输出 token × $4.00/M = $80/月
-- **仅输出压缩就节省 $520/月**
-
-**实现方式：** 系统提示词明确要求 Claude 只返回 JSON，`max_tokens` 设为 100（安全余量 — 实际响应约 20 个 token）。
-
-```python
-# 客户端强制结构化输出：
-# - 系统提示词："Respond with ONLY a JSON object, no other text"
-# - max_tokens=100（防止过长响应）
-# - 响应格式：{"safe": bool, "category": str, "confidence": float, "reason": str}
-```
+回复解析是防御式的：去除代码块标记，未知类别映射为 `other`，置信度限制在 [0, 1]，任何不是"带布尔 `safe` 字段的 JSON 对象"的回复都变为 `needs_review` 结果。
 
 ---
 
-### 策略 6：感知哈希预过滤（已知图片节省 100%）
+### 策略 5：感知哈希预过滤（已知图片节省 100%）
 
-**原理：** 感知哈希（pHash）根据图片的视觉内容生成指纹，对缩放、压缩和轻微编辑具有鲁棒性。通过维护一个已确认违规图片的哈希数据库，可以即时匹配重复上传和近似副本，完全不需要调用 Claude API。
+感知哈希（pHash）为图片视觉内容生成指纹，对缩放、重新编码和小幅编辑都很稳健。已知违规图片的再次上传可以免费匹配。
 
-**省钱机制：** 每张被 pHash 匹配的图片 API 调用成本为 $0。在用户重复上传相同违规内容的平台上（垃圾信息/滥用场景中很常见），这可以免费过滤掉 5-20% 的图片。
-
-**如何处理变体：** 与精确文件哈希（MD5/SHA）不同，pHash 比较的是视觉相似度。两张图片即使：
-- 不同文件格式（JPEG vs PNG）→ 相同 pHash
-- 不同分辨率 → 相同 pHash
-- 轻微裁剪或调色 → 相似 pHash（在阈值范围内）
-
-`threshold` 参数（默认 8）控制匹配严格程度。越低 = 越严格，误报越少。越高 = 越宽松，能匹配更多变体但误报风险增加。
+`threshold` 参数（默认 8，64 位中的汉明距离）控制严格程度。哈希 CSV 中格式错误的行会被跳过并发出警告。
 
 ```python
 from image_moderation.prefilter import PHashFilter
 from image_moderation.models import ModerationCategory
 
-# 从已确认的违规图片构建哈希数据库
 phash = PHashFilter()
 phash.add_hash(phash.compute_hash("known_spam_1.jpg"), ModerationCategory.SPAM)
-phash.add_hash(phash.compute_hash("known_violence_1.jpg"), ModerationCategory.VIOLENCE)
-phash.save_db("known_violations.csv")
+phash.save_db("known_violations.csv")   # 每行 hash,category
 
-# 生产环境中，匹配是即时且免费的：
 result = phash.check("user_upload.jpg", threshold=8)
 if result:
-    print(f"命中已知违规: {result.category}（置信度: {result.confidence}）")
+    print(f"匹配已知违规: {result.category}（置信度: {result.confidence}）")
 ```
+
+---
+
+### 策略 6：提示词缓存（对内置提示词无效）
+
+客户端会给系统提示词加上 `cache_control`，但 API 只缓存达到模型最小长度的前缀：**Haiku 4.5 为 4,096 token**，**Sonnet 5 为 1,024 token**。内置提示词约 300 token，因此不会被缓存，`cached_tokens` 始终为 0。该标记无害。图片本身每次请求都不同，永远无法缓存。
+
+如果你把提示词换成超过最小长度的长策略文档，缓存读取按输入价格的 0.1 倍计费，缓存写入按 1.25 倍计费。可通过 `result.cached_tokens`（`cache_read_input_tokens`）确认是否命中。
 
 ## 快速开始
 
+需要 Python 3.9+。
+
 ```bash
 cd cost-saving/image-moderation
-pip install -e .
+pip install -e '.[dev]'
+pytest -q        # 单元测试，不调用 API
 ```
 
-### 单张图片审核
+### 单张图片
 
 ```python
 from image_moderation import ImageModerationPipeline
 
-pipeline = ImageModerationPipeline(
-    enable_cache=True,
-    max_image_size=768,
-    sonnet_threshold=0.7,
-)
+pipeline = ImageModerationPipeline(max_image_size=768, sonnet_threshold=0.7)
 
 result = pipeline.moderate("photo.jpg")
-print(result.safe)          # True/False
-print(result.category)      # ModerationCategory.SAFE
-print(result.cost_summary)  # Level: haiku | Tokens: 1050in/25out (500 cached) | Cost: $0.000640
+print(result.safe, result.needs_review)   # True/False；True 表示需要人工复核
+print(result.category)                    # ModerationCategory.SAFE
+print(result.cost_summary)
+# Level: haiku | Tokens: 770in/28out (0 cache read, 0 cache write) | Cost: $0.000910
 ```
 
-### 批量处理（便宜 50%）
-
-```python
-from pathlib import Path
-
-images = list(Path("uploads/").glob("*.jpg"))
-batch_id = pipeline.moderate_batch_async(images)
-
-# 稍后轮询（批量 API 在 24 小时内返回）
-results = pipeline.get_batch_results(batch_id)
-flagged = [r for r in results if not r.safe]
-```
-
-### 使用 pHash 预过滤
+### 启用 pHash 预过滤
 
 ```python
 pipeline = ImageModerationPipeline(
-    hash_db_path="known_violations.csv",  # 每行格式：hash,category
-    cascade_levels=["phash", "haiku", "sonnet"],
+    hash_db_path="known_violations.csv",
+    cascade_levels=["phash", "haiku", "sonnet"],   # "prefilter" 可作为 "phash" 的别名
 )
-
-# 随时间积累哈希数据库
-from image_moderation.prefilter import PHashFilter
-phash = PHashFilter()
-h = phash.compute_hash("confirmed_violation.jpg")
-phash.add_hash(h, ModerationCategory.VIOLENCE)
-phash.save_db("known_violations.csv")
 ```
 
 ## 配置参数
 
 | 参数 | 默认值 | 说明 |
-|-----|-------|------|
+|------|-------|------|
 | `max_image_size` | 768 | 缩放最大尺寸（越小越便宜） |
 | `image_quality` | 75 | JPEG 压缩质量 |
-| `sonnet_threshold` | 0.7 | 低于此置信度触发 Sonnet 升级 |
-| `enable_cache` | True | 缓存系统提示词，节省 90% token |
-| `cascade_levels` | 全部 | 启用的层级：`phash`、`haiku`、`sonnet` |
+| `sonnet_threshold` | 0.7 | Haiku 置信度低于此值（无论判定结果）时升级到 Sonnet |
+| `enable_cache` | True | 给系统提示词加 `cache_control`（仅当提示词超过模型最小长度时生效） |
+| `cascade_levels` | 全部 | `phash`（别名 `prefilter`）、`haiku`、`sonnet` 的任意组合；未知名称抛出 `ValueError` |
+| `client` | None | 预先构建的 `anthropic.Anthropic` 兼容客户端（便于测试） |
 
 ## 成本估算
-
-运行成本对比脚本：
 
 ```bash
 python examples/cost_comparison.py
 ```
 
-**100 万张图片/月** 的示例输出：
+修改脚本顶部的假设参数（图片尺寸、升级率、pHash 命中率、输出长度）以匹配你的流量。默认参数下：
 
-| 策略 | 月成本 |
-|------|-------|
-| 朴素方案（原图 → Sonnet） | ~$18,000 |
-| 缩图 → Haiku | ~$1,000 |
-| 完整流水线 + 批量 | ~$50 |
+| 策略 | 月成本（100 万张） |
+|------|-------------|
+| 基准（原始 4K → Sonnet 5） | ~$11,700 |
+| 缩放 → Haiku 4.5 | ~$913 |
+| 完整实时流水线 | ~$1,041 |
+| 批量，仅 Haiku | ~$434 |
 
 ## 项目结构
 
 ```
 image_moderation/
 ├── __init__.py          # 公共 API
-├── models.py            # 数据模型、枚举、成本估算
-├── preprocessing.py     # 图片缩放/压缩/编码
-├── prefilter.py         # 感知哈希匹配已知违规图片
-├── client.py            # Claude API 封装（缓存 + 批量）
-└── pipeline.py          # 分层级联调度器
+├── models.py            # 数据模型、枚举、定价、成本估算
+├── preprocessing.py     # 图片方向/透明/缩放/编码 + token 估算
+├── prefilter.py         # pHash 匹配已知违规
+├── client.py            # Claude API 封装（解析、错误处理、批量）
+└── pipeline.py          # 分层级联编排
 examples/
-├── basic_moderation.py  # 单图审核示例
-├── batch_moderation.py  # 批量 API 示例
-└── cost_comparison.py   # 成本节省计算器
+├── basic_moderation.py  # 单张图片示例
+├── batch_moderation.py  # 批量 API 示例（轮询直到 ended）
+└── cost_comparison.py   # 成本计算器（假设参数）
+tests/                   # 使用假 Anthropic 客户端的 pytest 测试
 ```
