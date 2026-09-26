@@ -29,6 +29,24 @@ description: Product review from a PM perspective. Uses multi-agent pipeline to 
 /product-review ~/codes/my-project --quick --focus=dx
 ```
 
+## Prerequisites: Register the Agents
+
+The 5 pipeline agents live in this skill's `agents/` directory (`pr-discovery`, `pr-goal-alignment`, `pr-ux-dx-audit`, `pr-competitive-analysis`, `pr-roadmap-planner`). **Claude Code does not auto-register agents inside a skill folder**, so install them once:
+
+```bash
+# User-level (all projects). Adjust the source path to where this skill is installed.
+SKILL_DIR=~/.claude/skills/product-review
+mkdir -p ~/.claude/agents
+cp "$SKILL_DIR"/agents/pr-*.md ~/.claude/agents/
+
+# Or project-level (current repo only)
+mkdir -p .claude/agents && cp "$SKILL_DIR"/agents/pr-*.md .claude/agents/
+```
+
+Restart Claude Code (or run `/agents`) so they are picked up.
+
+**Fallback if an agent is not registered:** when a step says "Run the `pr-xxx` agent" and `subagent_type: "pr-xxx"` is unavailable, do not abort. Instead read `agents/pr-xxx.md` from this skill directory, strip the YAML frontmatter, and spawn a `general-purpose` agent whose prompt is that file's body followed by the step's concrete Input/Output paths, focus and language notes. Log it as `⚠ fallback: general-purpose` in `pipeline.log`.
+
 ## Output Structure
 
 All outputs are generated in the target project's root directory:
@@ -159,7 +177,7 @@ Run the `pr-discovery` agent.
 
 ### Step 3: Agent 2 + Agent 3 (Parallel)
 
-Run `pr-goal-alignment` and `pr-ux-dx-audit` **in parallel** using two Task tool calls in a single message.
+Run `pr-goal-alignment` and `pr-ux-dx-audit` **in parallel** using two Agent (Task) tool calls in a single message.
 
 **Agent 2 Input:** `.product-review/raw/snapshot.md` + `.product-review/analysis/discovery.md`
 **Agent 2 Output:** `.product-review/analysis/goal-alignment.md`

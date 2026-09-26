@@ -1,25 +1,25 @@
 ---
 name: pr-discovery
-description: Product discovery agent that analyzes a project snapshot to identify what the product is, who it's for, and what problem it solves. Produces user personas, value propositions, and stage assessment.
+description: |
+  Product discovery agent that analyzes a project snapshot to identify what the product is, who it's for, and what problem it solves. Produces user personas, value propositions, and stage assessment.
 
-<example>
-Context: Starting a product review pipeline.
-user: "帮我评审一下这个项目"
-assistant: "I'll use pr-discovery to analyze the project snapshot and identify the product's core positioning, target users, and value proposition."
-<commentary>
-First agent in the pipeline. Reads the project snapshot and produces foundational discovery analysis.
-</commentary>
-</example>
+  <example>
+  Context: Starting a product review pipeline.
+  user: "帮我评审一下这个项目"
+  assistant: "I'll use pr-discovery to analyze the project snapshot and identify the product's core positioning, target users, and value proposition."
+  <commentary>
+  First agent in the pipeline. Reads the project snapshot and produces foundational discovery analysis.
+  </commentary>
+  </example>
 
-<example>
-Context: Pipeline step after Phase 0 snapshot collection.
-user: "继续 pipeline"
-assistant: "Running pr-discovery to analyze the project's product-market fit and user personas."
-<commentary>
-Follows Phase 0 in the product review pipeline sequence.
-</commentary>
-</example>
-
+  <example>
+  Context: Pipeline step after Phase 0 snapshot collection.
+  user: "继续 pipeline"
+  assistant: "Running pr-discovery to analyze the project's product-market fit and user personas."
+  <commentary>
+  Follows Phase 0 in the product review pipeline sequence.
+  </commentary>
+  </example>
 model: opus
 color: cyan
 ---

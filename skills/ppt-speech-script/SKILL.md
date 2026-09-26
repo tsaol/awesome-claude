@@ -1,7 +1,6 @@
 ---
 name: ppt-speech-script
 description: "Generate a speech script from an existing PowerPoint presentation. Use this skill when the user has a .pptx file and wants a speaker script, presentation notes, or talk script to accompany it. Triggers on: 'speech script', 'speaker notes', 'talk script', 'presentation script', '演讲稿', '讲稿'"
-license: Proprietary. LICENSE.txt has complete terms
 ---
 
 # PPT Speech Script Generator
@@ -25,14 +24,16 @@ Extract text, visual layout, and embedded images from the presentation using thr
 python3 -m markitdown <pptx_file>
 ```
 
+> The helper scripts below come from the separate `pptx` skill, referenced at its installed location `~/.claude/skills/pptx/`. If you installed it elsewhere (e.g. project-level `.claude/skills/pptx/`), set `PPTX_SKILL_DIR` to that directory.
+
 **Visual layout (thumbnail grid):**
 ```bash
-python3 skills/pptx/scripts/thumbnail.py <pptx_file> <output_dir>/thumbnails --cols 5
+python3 "${PPTX_SKILL_DIR:-$HOME/.claude/skills/pptx}/scripts/thumbnail.py" <pptx_file> <output_dir>/thumbnails --cols 5
 ```
 
 **Image extraction (unpack media files):**
 ```bash
-python3 skills/pptx/ooxml/scripts/unpack.py <pptx_file> <output_dir>/unpacked
+python3 "${PPTX_SKILL_DIR:-$HOME/.claude/skills/pptx}/ooxml/scripts/unpack.py" <pptx_file> <output_dir>/unpacked
 ```
 
 Then:
@@ -182,8 +183,8 @@ If a `speech-script.md` already exists, ask the user before overwriting.
 These should already be available from the `pptx` skill:
 
 - **markitdown**: `pip install "markitdown[pptx]"` — text extraction
-- **thumbnail.py**: `skills/pptx/scripts/thumbnail.py` — visual layout analysis
-- **unpack.py**: `skills/pptx/ooxml/scripts/unpack.py` — PPTX unpacking for media extraction
+- **thumbnail.py**: `~/.claude/skills/pptx/scripts/thumbnail.py` (or `$PPTX_SKILL_DIR/scripts/thumbnail.py`) — visual layout analysis
+- **unpack.py**: `~/.claude/skills/pptx/ooxml/scripts/unpack.py` (or `$PPTX_SKILL_DIR/ooxml/scripts/unpack.py`) — PPTX unpacking for media extraction
 - **LibreOffice**: for PDF conversion (used by thumbnail.py)
 - **Poppler**: for PDF-to-image conversion (used by thumbnail.py)
 

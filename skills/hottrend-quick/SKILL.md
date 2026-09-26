@@ -1,6 +1,6 @@
 ---
 name: hottrend-quick
-description: Quick photo essay pipeline for hot topics. Produces ~600 word image-driven articles using Claude Opus + Kimi K2.5 refinement. 7-step fast workflow.
+description: Quick photo essay pipeline for hot topics. Produces ~600 word image-driven articles using Claude Opus + optional Kimi K2.5 refinement (requires the external ai-writing repo). 7-step fast workflow.
 ---
 
 # Hottrend Quick - 热点图文速报
@@ -20,12 +20,27 @@ description: Quick photo essay pipeline for hot topics. Produces ~600 word image
 /hottrend-quick "Apple WWDC 2026" --no-publish
 ```
 
+## Prerequisites（外部依赖）
+
+本 skill 依赖外部仓库 **ai-writing**（包含 PROMPT 文件和 `.claude/agents/` 下的 agent 定义），本仓库不包含这些文件。通过环境变量 `AI_WRITING_DIR` 指定其位置，默认 `~/code/ai-writing`：
+
+```bash
+export AI_WRITING_DIR="$HOME/code/ai-writing"   # 按实际位置修改
+```
+
+**开始执行前先检查**，缺失时立即停止并清晰提示用户，不要凭空臆造流程：
+
+```bash
+AI_WRITING_DIR="${AI_WRITING_DIR:-$HOME/code/ai-writing}"
+[ -f "$AI_WRITING_DIR/PROMPT-hottrend-quick.md" ] || { echo "✗ 未找到 $AI_WRITING_DIR/PROMPT-hottrend-quick.md：本 skill 需要外部 ai-writing 仓库，请 clone 后设置 AI_WRITING_DIR"; exit 1; }
+```
+
 ## Pipeline (7 Steps)
 
 **执行此 skill 时，必须读取并严格按照以下 PROMPT 文件执行：**
 
 ```
-/home/ubuntu/codes/ai-writing/PROMPT-hottrend-quick.md
+$AI_WRITING_DIR/PROMPT-hottrend-quick.md
 ```
 
 ### 流程概览
@@ -48,7 +63,9 @@ Step 7: wechat-mcp                 → 公众号草稿箱
 | quick-refiner | Kimi K2.5 | 口语化润色最自然 |
 | title/de-ai | Claude Opus | 质量把关 |
 
-### Agents (in ~/codes/ai-writing/.claude/agents/)
+> **Kimi K2.5 是可选的。** Step 4 通过 ai-writing 仓库中的 `invoke_model.py` 调用 Kimi K2.5，需要事先在该脚本中配置好可用的 Kimi 接入方式（例如 Moonshot API Key 或 Amazon Bedrock 上的 Kimi 模型及对应凭证，具体参数见 ai-writing 仓库说明）。如果未配置或调用失败，不要中断 pipeline：改用 Claude 按同样的口语化润色要求完成 Step 4，输出仍写到 `output/v2_kimi.md`，并在 `pipeline.log` 记录 `⚠ Kimi 不可用，已回退到 Claude`。
+
+### Agents (in $AI_WRITING_DIR/.claude/agents/)
 
 | Step | Agent | Role |
 |------|-------|------|

@@ -26,7 +26,13 @@ Examples:
 The skill produces a single self-contained HTML file:
 - `~/tmp/<name>-diagram.html` — Standalone, no dependencies, opens in any browser
 
-Then copies to `~/cls-laptop/` and generates an S3 pre-signed URL for sharing.
+Optionally (only if configured) copies it to a local sync folder and/or uploads it to S3 and generates a pre-signed URL for sharing:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `CARD_DIAGRAM_SYNC_DIR` | Local folder to copy the HTML into (e.g. a synced drive) | unset → skip |
+| `CARD_DIAGRAM_S3_URI` | S3 prefix to upload to, e.g. `s3://my-bucket/diagrams/` | unset → skip S3 |
+| `AWS_REGION` | Region for the pre-signed URL | your AWS config |
 
 ## Style Specification
 
@@ -293,10 +299,11 @@ Produce a single self-contained HTML file with:
 ### Step 4: Deliver
 
 1. Write to `~/tmp/<name>-diagram.html`
-2. Copy to `~/cls-laptop/` for S3 sync
-3. Upload to S3: `aws s3 cp ~/tmp/<name>-diagram.html s3://cls-laptop/diagrams/`
-4. Generate pre-signed URL: `aws s3 presign s3://cls-laptop/diagrams/<name>-diagram.html --expires-in 900 --region us-west-2`
-5. Show the URL to the user
+2. If `CARD_DIAGRAM_SYNC_DIR` is set: `cp ~/tmp/<name>-diagram.html "$CARD_DIAGRAM_SYNC_DIR/"`
+3. If `CARD_DIAGRAM_S3_URI` is set (e.g. `s3://my-bucket/diagrams/`):
+   - Upload: `aws s3 cp ~/tmp/<name>-diagram.html "${CARD_DIAGRAM_S3_URI%/}/"`
+   - Pre-signed URL: `aws s3 presign "${CARD_DIAGRAM_S3_URI%/}/<name>-diagram.html" --expires-in 900 ${AWS_REGION:+--region "$AWS_REGION"}`
+4. Show the URL (or the local file path if S3 is not configured) to the user
 
 ## Adaptation Guidelines
 

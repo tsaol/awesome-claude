@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Review project consistency and commit changes. Checks code vs docs alignment, updates CHANGELOG/README/DESIGN.md, updates ~/history.log, bumps version, then commits, pushes, and deploys if configured. Use after finishing code modifications.
+description: Review project consistency and commit changes. Checks code vs docs alignment, updates CHANGELOG/README/DESIGN.md, updates ~/history.log (if it exists), bumps version, then commits, pushes, and deploys if configured. Use after finishing code modifications.
 ---
 
 # Git Commit - Review, Fix, Commit & Deploy
@@ -14,7 +14,7 @@ This skill reviews project consistency after code changes to ensure:
 - No outdated documentation
 - ~/history.log is updated with session summary (if exists)
 - Version number is bumped appropriately
-- Deployment is triggered if configured in `~/.claude/collaboration.yml`
+- Deployment is triggered only if configured in `~/.claude/collaboration.yml` (optional; skipped if the file does not exist)
 
 ## When to Use
 
@@ -67,7 +67,7 @@ cat README.md
 
 ### 4. History Log Update
 
-Check if `~/history.log` exists and update it with session summary:
+Optional: only if `~/history.log` already exists, update it with a session summary (do not create it; skip this step if missing):
 
 ```bash
 # Check if history.log exists
@@ -258,7 +258,7 @@ After a successful push, check if the project has deployment configured and trig
 
 ### Deploy Config
 
-Deployment is configured per-project in `~/.claude/collaboration.yml`:
+Deployment is **optional** and configured per-project in `~/.claude/collaboration.yml` (override the path with `CLAUDE_COLLAB_CONFIG`). If the file does not exist, or the current project has no `deploy` entry, skip this whole section silently:
 
 ```yaml
 projects:
@@ -283,8 +283,9 @@ projects:
 **Step 1: Check if deploy is configured**
 
 ```bash
-# Read collaboration.yml and find current project's deploy config
-cat ~/.claude/collaboration.yml
+# Optional: only if the file exists. If missing, skip deploy entirely (not an error).
+CONFIG="${CLAUDE_COLLAB_CONFIG:-$HOME/.claude/collaboration.yml}"
+if [ -f "$CONFIG" ]; then cat "$CONFIG"; else echo "No deploy config ($CONFIG) - skipping deploy"; fi
 ```
 
 Identify current project by matching `git remote -v` against the `repo` field in collaboration.yml.
@@ -304,10 +305,10 @@ Do NOT deploy when:
 **Step 3: Confirm with user**
 
 ```
-🚀 Deploy detected for project "languages"
-   Method: ssm
-   Instance: i-0f86894d2231b1cd0
-   Command: cd /home/ubuntu/languages && git pull origin main && sudo systemctl restart englearn
+🚀 Deploy detected for project "<project-name>"
+   Method: <ssm|ssh|script>
+   Instance: <instance-id or host from collaboration.yml>
+   Command: <deploy command from collaboration.yml>
 
    Proceed with deployment? (y/n)
 ```
@@ -351,9 +352,9 @@ aws ssm send-command \
 
 ```markdown
 ### Deploy Result
-- Project: languages
-- Method: ssm
-- Instance: i-0f86894d2231b1cd0
+- Project: <project-name>
+- Method: <ssm|ssh|script>
+- Instance: <instance-id or host>
 - Status: ✅ SUCCESS / ❌ FAILED
 - Details: Service restarted successfully
 ```

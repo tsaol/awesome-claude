@@ -1,15 +1,11 @@
 ---
-inclusion: manual
+name: html-ppt
+description: Generate a hand-crafted, zero-dependency single-file HTML slide deck (no CDN, works offline, double-click to open) with viewport-safe layouts, inline rehearsal timer/notes, and optional PDF export or Vercel deploy; also converts .pptx to HTML and enhances existing HTML decks. Use when the user wants an HTML presentation / PPT for rehearsal, internal sharing or offline use. Prefer reveal-ppt when they need reveal.js transitions, vertical sub-slides, presenter mode or code highlighting, and beautiful-hackathon-slides for hackathon / demo-day pitch decks.
 ---
 
 # HTML PPT Skill
 
-> Invoke with `#html-ppt` + your topic. Generates a single-file HTML deck with zero dependencies.
->
-> Reference samples:
-> - `GlobalOperation/growth/amazon-growth-design-rehearsal.html`
-> - `GlobalOperation/growth/amazon-growth-design-walkthrough.html`
-> - `HR/AZA/presentations/html/shein_agent_review_slide.html`
+> Invoke with `/html-ppt` (or `#html-ppt`) + your topic. Generates a single-file HTML deck with zero dependencies.
 
 ---
 
@@ -326,17 +322,18 @@ bash scripts/export-pdf.sh <path-to-html> [output.pdf] [--compact]
 After generating a deck, offer deployment for sharing:
 
 ```bash
-bash scripts/deploy.sh <path-to-html>
+bash scripts/deploy.sh <path-to-html>          # asks for confirmation before the public deploy
+bash scripts/deploy.sh --yes <path-to-html>    # skip the prompt (or DEPLOY_CONFIRM=1)
 ```
 
-- Deploys to a live URL that works on any device (phones, tablets, laptops)
+- Deploys to a **public** live URL that works on any device (phones, tablets, laptops) — always get the user's OK first; the script itself also asks (non-interactive runs require `--yes` / `DEPLOY_CONFIRM=1`)
 - Free hosting via Vercel, no server to maintain
-- Single HTML files are auto-wrapped with `index.html`
-- Referenced local assets (images, fonts) are bundled automatically
+- Single HTML files are auto-wrapped with `index.html` in a fresh `mktemp -d` directory
+- Referenced local assets (images, fonts) are bundled automatically — only relative paths inside the HTML's own directory; `..`, absolute paths and symlinks pointing outside are skipped
 
 **First-time setup:**
 1. Node.js required (`brew install node` or https://nodejs.org)
-2. Vercel CLI installs automatically via npx
+2. Uses `vercel` if installed, otherwise runs it via `npx vercel` (temporary download, never a global install). Install permanently with `npm install -g vercel` if you prefer
 3. User runs `vercel login` if not already authenticated
 
 **Gotchas:**
@@ -380,6 +377,8 @@ For techy/futuristic styles (Neon Cyber, Terminal Green), also include:
 | [scripts/extract-pptx.py](scripts/extract-pptx.py) | PPT content extraction | When converting .pptx files |
 | [scripts/export-pdf.sh](scripts/export-pdf.sh) | PDF export | When user wants PDF output |
 | [scripts/deploy.sh](scripts/deploy.sh) | Deploy to Vercel for sharing | When user wants a live URL |
+
+> `scripts/extract-pptx.py` and `scripts/export-pdf.sh` are intentionally byte-identical copies of the ones in the `reveal-ppt` skill, so each skill stays self-contained when installed on its own. Keep them in sync when editing.
 
 ---
 

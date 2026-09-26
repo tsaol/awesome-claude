@@ -11,11 +11,14 @@ Usage:
     python3 docgen.py --type pptx --prompt-file prompt.txt --output deck.pptx
 
 Environment variables:
-    AWS_REGION      - AWS region (default: ap-northeast-1)
-    RUNTIME_ARN     - AgentCore Runtime ARN (required)
-    AWS credentials - From ~/.aws/credentials, env vars, or IAM role
+    AWS_REGION       - AWS region (fallback: AWS_DEFAULT_REGION, then the region in
+                       RUNTIME_ARN, then your AWS config)
+    RUNTIME_ARN      - AgentCore Runtime ARN (required)
+    DOCGEN_S3_BUCKET - S3 bucket for --persist-s3 (or pass --s3-bucket)
+    DOCGEN_ENV_FILE  - Optional path to a .env file to load (default: <skill-dir>/.env)
+    AWS credentials  - From ~/.aws/credentials, env vars, or IAM role
 
-Optionally reads .env from ~/codes/document-generation-mcp/.env if present.
+.env files are only loaded if they exist; real env vars take precedence.
 """
 
 import argparse
@@ -31,12 +34,14 @@ VALID_TYPES = {"docx", "pdf", "pptx", "xlsx", "frontend-design"}
 # Transient error patterns that warrant a retry
 _TRANSIENT_PATTERNS = ("timeout", "timed out", "connection", "prematurely", "reset by peer")
 
-# Try loading .env from document-generation-mcp project (optional)
-for _env_candidate in [
-    Path.home() / "codes" / "document-generation-mcp" / ".env",
-    Path(__file__).resolve().parent.parent / ".env",
-]:
-    if _env_candidate.exists():
+# Optionally load a .env file: $DOCGEN_ENV_FILE if set, else <skill-dir>/.env.
+# Only loaded if it exists; existing environment variables always win.
+_env_candidates = []
+if os.environ.get("DOCGEN_ENV_FILE"):
+    _env_candidates.append(Path(os.environ["DOCGEN_ENV_FILE"]).expanduser())
+_env_candidates.append(Path(__file__).resolve().parent.parent / ".env")
+for _env_candidate in _env_candidates:
+    if _env_candidate.is_file():
         for line in _env_candidate.read_text().splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
@@ -44,8 +49,10 @@ for _env_candidate in [
                 os.environ.setdefault(key.strip(), value.strip())
         break
 
-DEFAULT_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
+# Region: --region > $AWS_REGION > $AWS_DEFAULT_REGION > region in RUNTIME_ARN > AWS config
+DEFAULT_REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or None
 DEFAULT_RUNTIME_ARN = os.environ.get("RUNTIME_ARN", "")
+DEFAULT_S3_BUCKET = os.environ.get("DOCGEN_S3_BUCKET", "")
 
 
 def _is_transient_error(error: Exception) -> bool:
@@ -145,15 +152,83 @@ def _split_pptx_prompt(prompt: str, max_slides_per_batch: int = 11):
     return batches
 
 
+_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+_RT_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+# Relationships that must not be copied from a source slide (they belong to the
+# destination deck's own structure).
+_RT_SKIP = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide",
+)
+
+
+def _remap_rids(element, rid_map):
+    """Rewrite every r:* attribute (r:embed, r:link, r:id, ...) using rid_map."""
+    for el in element.iter():
+        for attr, val in list(el.attrib.items()):
+            if attr.startswith("{%s}" % _R_NS) and val in rid_map:
+                el.set(attr, rid_map[val])
+
+
+def _clone_part(src_part, dest_package, cache):
+    """Deep-copy a non-image part (chart, embedded workbook, media, ...) into
+    dest_package under a fresh partname, recursively cloning its relationships.
+
+    The new part is returned unattached; the caller must relate it to a parent
+    before cloning the next part so next_partname() sees it.
+    """
+    import re
+    from pptx.opc.package import PartFactory
+    from pptx.opc.packuri import PackURI
+
+    key = id(src_part)
+    if key in cache:
+        return cache[key], False
+    tmpl = re.sub(r"\d*(\.[^./]+)$", r"%d\1", str(src_part.partname))
+    if "%d" not in tmpl:
+        tmpl = str(src_part.partname) + "%d"
+    partname = dest_package.next_partname(tmpl)
+    new_part = PartFactory(PackURI(str(partname)), src_part.content_type, dest_package, src_part.blob)
+    cache[key] = new_part
+    return new_part, True
+
+
+def _copy_part_rels(src_part, new_part, dest_package, cache):
+    """Copy src_part's relationships onto new_part, remapping r:id references."""
+    rid_map = {}
+    for rid, rel in list(src_part.rels.items()):
+        if rel.reltype in _RT_SKIP:
+            continue
+        if rel.is_external:
+            rid_map[rid] = new_part.relate_to(rel.target_ref, rel.reltype, is_external=True)
+            continue
+        target = rel.target_part
+        if rel.reltype == _RT_IMAGE and hasattr(new_part, "get_or_add_image_part"):
+            import io
+            _, rid_map[rid] = new_part.get_or_add_image_part(io.BytesIO(target.blob))
+            continue
+        child, created = _clone_part(target, dest_package, cache)
+        rid_map[rid] = new_part.relate_to(child, rel.reltype)
+        if created:
+            _copy_part_rels(target, child, dest_package, cache)
+    if rid_map and hasattr(new_part, "_element"):
+        _remap_rids(new_part._element, rid_map)
+    return rid_map
+
+
 def _merge_pptx_files(pptx_paths: list, output_path: str) -> bool:
     """Merge multiple PPTX files into one using python-pptx.
+
+    Shapes are deep-copied and every relationship they reference (pictures,
+    charts + embedded workbooks, media, hyperlinks) is copied into the
+    destination package with r:id attributes remapped.
 
     Returns True on success.
     """
     try:
         from pptx import Presentation
-        from pptx.util import Emu
         import copy
+        import io
 
         if not pptx_paths:
             return False
@@ -165,17 +240,49 @@ def _merge_pptx_files(pptx_paths: list, output_path: str) -> bool:
 
         # Use first file as base
         prs = Presentation(pptx_paths[0])
+        dest_package = prs.part.package
+        layouts = prs.slide_layouts
+        blank_layout = layouts[6] if len(layouts) > 6 else layouts[len(layouts) - 1]
 
         for path in pptx_paths[1:]:
             src = Presentation(path)
+            cache = {}
             for slide in src.slides:
-                # Add a blank slide and copy content
-                layout = prs.slide_layouts[6]  # blank layout
-                new_slide = prs.slides.add_slide(layout)
+                new_slide = prs.slides.add_slide(blank_layout)
+                # Drop placeholders the layout may have added
+                for ph in list(new_slide.placeholders):
+                    ph._element.getparent().remove(ph._element)
 
-                # Copy shapes
+                # Copy all slide-level relationships (images, charts, media, links)
+                # and build an old->new rId map.
+                rid_map = {}
+                for rid, rel in list(slide.part.rels.items()):
+                    if rel.reltype in _RT_SKIP:
+                        continue
+                    if rel.is_external:
+                        rid_map[rid] = new_slide.part.relate_to(rel.target_ref, rel.reltype, is_external=True)
+                    elif rel.reltype == _RT_IMAGE:
+                        _, rid_map[rid] = new_slide.part.get_or_add_image_part(io.BytesIO(rel.target_part.blob))
+                    else:
+                        child, created = _clone_part(rel.target_part, dest_package, cache)
+                        rid_map[rid] = new_slide.part.relate_to(child, rel.reltype)
+                        if created:
+                            _copy_part_rels(rel.target_part, child, dest_package, cache)
+
+                # Copy background (may reference an image)
+                src_bg = slide._element.cSld.bg
+                if src_bg is not None:
+                    bg = copy.deepcopy(src_bg)
+                    _remap_rids(bg, rid_map)
+                    new_cSld = new_slide._element.cSld
+                    if new_cSld.bg is not None:
+                        new_cSld.remove(new_cSld.bg)
+                    new_cSld.insert(0, bg)
+
+                # Copy shapes with remapped relationship ids
                 for shape in slide.shapes:
                     el = copy.deepcopy(shape._element)
+                    _remap_rids(el, rid_map)
                     new_slide.shapes._spTree.append(el)
 
                 # Copy notes
@@ -195,7 +302,8 @@ def _merge_pptx_files(pptx_paths: list, output_path: str) -> bool:
 
 
 def generate_pptx_split(prompt, output_path, region=None, runtime_arn=None,
-                        read_timeout=None, max_retries=3, max_slides_per_batch=11):
+                        read_timeout=None, max_retries=3, max_slides_per_batch=11,
+                        persist_s3=False, s3_bucket=None):
     """Generate a large PPTX by splitting into batches and merging.
 
     Automatically splits prompts with >max_slides_per_batch slides into parallel
@@ -210,7 +318,7 @@ def generate_pptx_split(prompt, output_path, region=None, runtime_arn=None,
     if len(batches) == 1:
         # No split needed
         return generate("pptx", prompt, output_path, region, runtime_arn,
-                        read_timeout, max_retries)
+                        read_timeout, max_retries, persist_s3=persist_s3, s3_bucket=s3_bucket)
 
     print(f"  Auto-splitting into {len(batches)} batches ({max_slides_per_batch} slides each)")
 
@@ -224,7 +332,7 @@ def generate_pptx_split(prompt, output_path, region=None, runtime_arn=None,
     def gen_batch(idx, batch_prompt, slide_range):
         part_path = f"{base_name}_Part{idx + 1}.pptx"
         result = generate("pptx", batch_prompt, part_path, region, runtime_arn,
-                          read_timeout, max_retries)
+                          read_timeout, max_retries, persist_s3=persist_s3, s3_bucket=s3_bucket)
         return idx, part_path, result
 
     with ThreadPoolExecutor(max_workers=len(batches)) as executor:
@@ -260,11 +368,11 @@ def generate_pptx_split(prompt, output_path, region=None, runtime_arn=None,
             "parts": part_paths,
         }
     else:
-        # Merge failed — return the individual parts as a partial success
+        # Merge failed — report failure honestly; the part files are kept on disk
         return {
-            "success": True,
-            "path": part_paths[0],
-            "size": sum(os.path.getsize(p) for p in part_paths),
+            "success": False,
+            "error": (f"All batches generated but merging into {output_path} failed; "
+                      f"individual parts kept: {', '.join(part_paths)}"),
             "elapsed": elapsed,
             "parts": part_paths,
             "merge_failed": True,
@@ -272,7 +380,7 @@ def generate_pptx_split(prompt, output_path, region=None, runtime_arn=None,
 
 
 def generate(skill_type, prompt, output_path, region=None, runtime_arn=None,
-             read_timeout=None, max_retries=3, persist_s3=False):
+             read_timeout=None, max_retries=3, persist_s3=False, s3_bucket=None):
     """Generate a document via AgentCore Runtime.
 
     Args:
@@ -283,7 +391,9 @@ def generate(skill_type, prompt, output_path, region=None, runtime_arn=None,
         runtime_arn: AgentCore Runtime ARN (default from env)
         read_timeout: HTTP read timeout in seconds (auto-estimated if None)
         max_retries: Number of retries for transient errors (default 3)
-        persist_s3: Also persist output to S3 cls-laptop/slides/ (default False)
+        persist_s3: Ask the remote agent to also persist output to S3 (default False)
+        s3_bucket: Target S3 bucket for persist_s3 (default: $DOCGEN_S3_BUCKET; required
+            when persist_s3 is True)
 
     Returns:
         dict with keys: success (bool), path (str), size (int), elapsed (float)
@@ -293,6 +403,8 @@ def generate(skill_type, prompt, output_path, region=None, runtime_arn=None,
 
     region = region or DEFAULT_REGION
     runtime_arn = runtime_arn or DEFAULT_RUNTIME_ARN
+    if not region and runtime_arn.startswith("arn:") and len(runtime_arn.split(":")) > 3:
+        region = runtime_arn.split(":")[3] or None  # e.g. arn:aws:bedrock-agentcore:<region>:...
 
     if not runtime_arn:
         return {"success": False, "error": "RUNTIME_ARN not configured. Set via env var or --runtime-arn."}
@@ -316,7 +428,12 @@ def generate(skill_type, prompt, output_path, region=None, runtime_arn=None,
         "filename": os.path.basename(output_path),
     }
     if persist_s3:
+        s3_bucket = s3_bucket or DEFAULT_S3_BUCKET
+        if not s3_bucket:
+            return {"success": False,
+                    "error": "persist_s3 requires an S3 bucket. Set DOCGEN_S3_BUCKET or pass --s3-bucket."}
         payload_dict["persist_s3"] = True
+        payload_dict["s3_bucket"] = s3_bucket
 
     payload = json.dumps(payload_dict)
 
@@ -386,12 +503,15 @@ def main():
     parser.add_argument("--prompt", help="Document description")
     parser.add_argument("--prompt-file", help="Read prompt from file")
     parser.add_argument("--output", "-o", required=True, help="Output file path")
-    parser.add_argument("--region", default=DEFAULT_REGION, help=f"AWS region (default: {DEFAULT_REGION})")
+    parser.add_argument("--region", default=DEFAULT_REGION, help=f"AWS region (default: {DEFAULT_REGION or '$AWS_REGION, else region from the runtime ARN'})")
     parser.add_argument("--runtime-arn", default=DEFAULT_RUNTIME_ARN, help="AgentCore Runtime ARN")
     parser.add_argument("--timeout", type=int, default=None, help="Read timeout in seconds (auto-estimated if omitted)")
     parser.add_argument("--no-split", action="store_true", help="Disable auto-split for large PPTX")
     parser.add_argument("--max-slides-per-batch", type=int, default=11, help="Max slides per batch when splitting (default: 11)")
-    parser.add_argument("--persist-s3", action="store_true", help="Also persist output to S3 cls-laptop/slides/")
+    parser.add_argument("--persist-s3", action="store_true",
+                        help="Also persist output to S3 (requires --s3-bucket or DOCGEN_S3_BUCKET)")
+    parser.add_argument("--s3-bucket", default=DEFAULT_S3_BUCKET or None,
+                        help="S3 bucket for --persist-s3 (default: $DOCGEN_S3_BUCKET)")
 
     args = parser.parse_args()
 
@@ -407,7 +527,10 @@ def main():
     print(f"Prompt length: {len(prompt)} chars")
 
     if args.persist_s3:
-        print("S3 persist enabled: output will also be saved to s3://cls-laptop/slides/")
+        if not args.s3_bucket:
+            print("Error: --persist-s3 requires --s3-bucket or DOCGEN_S3_BUCKET", file=sys.stderr)
+            sys.exit(1)
+        print(f"S3 persist enabled: output will also be saved to s3://{args.s3_bucket}/")
 
     # Auto-split for large PPTX unless disabled
     if args.skill_type == "pptx" and not args.no_split:
@@ -422,6 +545,8 @@ def main():
                 read_timeout=args.timeout,
                 max_retries=3,
                 max_slides_per_batch=args.max_slides_per_batch,
+                persist_s3=args.persist_s3,
+                s3_bucket=args.s3_bucket,
             )
         else:
             timeout = args.timeout or _estimate_timeout("pptx", prompt)
@@ -434,6 +559,7 @@ def main():
                 runtime_arn=args.runtime_arn,
                 read_timeout=args.timeout,
                 persist_s3=args.persist_s3,
+                s3_bucket=args.s3_bucket,
             )
     else:
         if not args.timeout:
@@ -447,6 +573,7 @@ def main():
             runtime_arn=args.runtime_arn,
             read_timeout=args.timeout,
             persist_s3=args.persist_s3,
+            s3_bucket=args.s3_bucket,
         )
 
     if result["success"]:
@@ -457,10 +584,10 @@ def main():
             print(f"S3: {result['s3_uri']}")
         if result.get("parts"):
             print(f"Parts: {', '.join(result['parts'])}")
-        if result.get("merge_failed"):
-            print("  Note: merge failed, individual part files preserved")
     else:
         print(f"Failed: {result['error']}", file=sys.stderr)
+        if result.get("parts"):
+            print(f"Parts: {', '.join(result['parts'])}", file=sys.stderr)
         sys.exit(1)
 
 

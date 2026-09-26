@@ -38,7 +38,7 @@
 使用以下提示词模板与 Claude Code 进行多轮对话：
 
 ```
-我有一个 AWS GPU 实例对比网站（/home/ubuntu/codes/aws-gpu/index.html），
+我有一个 AWS GPU 实例对比网站（./aws-gpu/index.html，请替换为你的实际路径），
 当前是静态表格展示。请作为产品设计大师，帮我重新设计：
 
 **设计目标：**
@@ -212,7 +212,7 @@ transform: translateY(-3px);
 ### Step 1: 评估现状
 ```bash
 # 查看当前文件结构
-ls -lh /home/ubuntu/codes/aws-gpu/
+ls -lh ./aws-gpu/
 ```
 
 当前状态：
@@ -266,7 +266,7 @@ ls -lh /home/ubuntu/codes/aws-gpu/
 ### 模板 1：视觉优化
 
 ```
-优化 /home/ubuntu/codes/aws-gpu/index.html 的视觉设计：
+优化 ./aws-gpu/index.html 的视觉设计：
 
 1. 配色方案：使用 AWS 官方配色（#232F3E + #FF9900）
 2. 表格优化：增加行高、优化对齐、添加斑马纹
@@ -282,7 +282,7 @@ ls -lh /home/ubuntu/codes/aws-gpu/
 ### 模板 2：功能增强
 
 ```
-为 /home/ubuntu/codes/aws-gpu/index.html 添加交互功能：
+为 ./aws-gpu/index.html 添加交互功能：
 
 功能需求：
 1. 搜索框：实时过滤实例（按名称或 GPU 型号）
@@ -302,7 +302,7 @@ ls -lh /home/ubuntu/codes/aws-gpu/
 ### 模板 3：数据可视化
 
 ```
-为 /home/ubuntu/codes/aws-gpu/index.html 添加数据可视化：
+为 ./aws-gpu/index.html 添加数据可视化：
 
 需求：
 1. 顶部统计卡片：总实例数、最新发布、价格区间

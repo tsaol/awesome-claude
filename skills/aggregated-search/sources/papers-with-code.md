@@ -2,6 +2,10 @@
 
 ML papers with implementation code.
 
+> ⚠️ **Discontinued:** Papers With Code was shut down in July 2025 and paperswithcode.com now redirects to Hugging Face Papers. The API below no longer works and is kept for reference only.
+>
+> **Alternative:** Hugging Face Papers — `WebFetch: https://huggingface.co/papers?q={keyword}` (search) or `https://huggingface.co/papers` (daily trending). Prompt: "Extract paper titles, arXiv links, upvotes and linked GitHub repos. Return as markdown." Use `github` search for implementation code.
+
 ## API Endpoint
 
 ```

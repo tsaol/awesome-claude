@@ -1,6 +1,6 @@
 ---
 name: hottrend-article
-description: Full hottrend article pipeline. Aggregates sources, drafts, reviews, refines, generates images, and packages for WeChat publication. 11-step multi-agent workflow.
+description: Full hottrend article pipeline. Aggregates sources, drafts, reviews, refines, generates images, and packages for WeChat publication. 11-step multi-agent workflow. Requires the external ai-writing repo (AI_WRITING_DIR).
 ---
 
 # Hottrend Article - 热点深度文章生产
@@ -20,12 +20,27 @@ description: Full hottrend article pipeline. Aggregates sources, drafts, reviews
 /hottrend-article "AI Agent 2026" --no-publish
 ```
 
+## Prerequisites（外部依赖）
+
+本 skill 依赖外部仓库 **ai-writing**（包含 PROMPT 文件和 `.claude/agents/` 下的 agent 定义），本仓库不包含这些文件。通过环境变量 `AI_WRITING_DIR` 指定其位置，默认 `~/code/ai-writing`：
+
+```bash
+export AI_WRITING_DIR="$HOME/code/ai-writing"   # 按实际位置修改
+```
+
+**开始执行前先检查**，缺失时立即停止并清晰提示用户，不要凭空臆造流程：
+
+```bash
+AI_WRITING_DIR="${AI_WRITING_DIR:-$HOME/code/ai-writing}"
+[ -f "$AI_WRITING_DIR/PROMPT-hottrend.md" ] || { echo "✗ 未找到 $AI_WRITING_DIR/PROMPT-hottrend.md：本 skill 需要外部 ai-writing 仓库，请 clone 后设置 AI_WRITING_DIR"; exit 1; }
+```
+
 ## Pipeline (11 Steps)
 
 **执行此 skill 时，必须读取并严格按照以下 PROMPT 文件执行：**
 
 ```
-/home/ubuntu/codes/ai-writing/PROMPT-hottrend.md
+$AI_WRITING_DIR/PROMPT-hottrend.md
 ```
 
 ### 流程概览
@@ -44,7 +59,7 @@ Step 10: de-ai-filter           → output/v3_final.md
 Step 11: hottrend-wx-packager   → package.json + 发布
 ```
 
-### Agents (in ~/codes/ai-writing/.claude/agents/)
+### Agents (in $AI_WRITING_DIR/.claude/agents/)
 
 | Step | Agent | Role |
 |------|-------|------|

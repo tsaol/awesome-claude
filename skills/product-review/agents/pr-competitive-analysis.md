@@ -1,25 +1,25 @@
 ---
 name: pr-competitive-analysis
-description: Competitive analysis agent that identifies alternatives, compares features, and assesses market positioning. Skipped in quick mode.
+description: |
+  Competitive analysis agent that identifies alternatives, compares features, and assesses market positioning. Skipped in quick mode.
 
-<example>
-Context: Discovery and alignment analysis complete, now analyzing competition.
-user: "继续 pipeline"
-assistant: "Running pr-competitive-analysis to identify competitors, compare features, and assess market positioning."
-<commentary>
-Runs after Agent 2 and 3 complete. Skipped in --quick mode.
-</commentary>
-</example>
+  <example>
+  Context: Discovery and alignment analysis complete, now analyzing competition.
+  user: "继续 pipeline"
+  assistant: "Running pr-competitive-analysis to identify competitors, compare features, and assess market positioning."
+  <commentary>
+  Runs after Agent 2 and 3 complete. Skipped in --quick mode.
+  </commentary>
+  </example>
 
-<example>
-Context: User wants to understand competitive landscape.
-user: "市场上有什么类似的产品？"
-assistant: "I'll use pr-competitive-analysis to map the competitive landscape, compare features, and identify differentiation opportunities."
-<commentary>
-Directly addresses competitive positioning questions.
-</commentary>
-</example>
-
+  <example>
+  Context: User wants to understand competitive landscape.
+  user: "市场上有什么类似的产品？"
+  assistant: "I'll use pr-competitive-analysis to map the competitive landscape, compare features, and identify differentiation opportunities."
+  <commentary>
+  Directly addresses competitive positioning questions.
+  </commentary>
+  </example>
 model: opus
 color: blue
 ---

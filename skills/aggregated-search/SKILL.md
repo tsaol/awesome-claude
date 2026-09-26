@@ -1,6 +1,11 @@
+---
+name: aggregated-search
+description: Multi-source content aggregation for hot-topic / trend research. Searches GitHub, Hacker News, Reddit, DEV.to, ArXiv, Semantic Scholar, Tavily, Exa, tech news, AI lab and cloud blogs, Chinese tech media (36氪/知乎/掘金/机器之心) and more in parallel, then dedupes into raw/aggregated.md. Use when the user asks to research, survey or collect recent content/discussions on a topic across many sources, or invokes /aggregated-search.
+---
+
 # Aggregated Search Skill
 
-Multi-source content aggregation for hot topics research. Supports 15+ data sources.
+Multi-source content aggregation for hot topics research. Supports 20+ data sources.
 
 ## Usage
 
@@ -10,7 +15,7 @@ Multi-source content aggregation for hot topics research. Supports 15+ data sour
 
 **Options:**
 - `--sources=all` - Search all sources (default)
-- `--sources=github,hn,reddit` - Specific sources
+- `--sources=github,hn,reddit` - Specific sources (use the **Name** column below, or a group)
 - `--limit=50` - Max results per source (default: 50)
 - `--days=7` - Content age limit in days (default: 7)
 - `--lang=en` - Language: en, zh, all (default: all)
@@ -24,50 +29,62 @@ Multi-source content aggregation for hot topics research. Supports 15+ data sour
 /aggregated-search "RAG" --limit=100 --days=30
 ```
 
-## Supported Sources (15+)
+## Supported Sources (20+)
+
+The **Name** column is the value accepted by `--sources=`; the **File** column is the instruction file under `sources/` to read for that name. Several names can share one file (e.g. `36kr` and `zhihu` both live in `chinese-tech.md`) — in that case read the file once and only run the section for the requested site.
 
 ### Code & Projects
-| Source | File | API | Free |
-|--------|------|-----|------|
-| GitHub | github.md | gh api | ✅ |
-| Papers With Code | papers-with-code.md | REST | ✅ |
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `github` | GitHub | github.md | gh api | ✅ |
+| `papers-with-code` | Papers With Code ⚠️ **Discontinued** | papers-with-code.md | — | — |
+
+> ⚠️ Papers With Code was shut down in July 2025 and now redirects to Hugging Face Papers; its API no longer works. Skip it by default and use Hugging Face Papers instead (`WebFetch: https://huggingface.co/papers?q={keyword}` or the trending list at `https://huggingface.co/papers`), plus `github` for implementation code.
 
 ### Tech Communities
-| Source | File | API | Free |
-|--------|------|-----|------|
-| Hacker News | hackernews.md | Algolia | ✅ |
-| Reddit | reddit.md | JSON | ✅ |
-| DEV.to | devto.md | REST | ✅ |
-| Product Hunt | producthunt.md | GraphQL | ✅ |
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `hn` / `hackernews` | Hacker News | hackernews.md | Algolia | ✅ |
+| `reddit` | Reddit | reddit.md | JSON | ✅ |
+| `devto` | DEV.to | devto.md | REST | ✅ |
+| `producthunt` | Product Hunt | producthunt.md | GraphQL | ✅ |
 
 ### Academic
-| Source | File | API | Free |
-|--------|------|-----|------|
-| ArXiv | arxiv.md | XML | ✅ |
-| Semantic Scholar | semantic-scholar.md | REST | ✅ |
-| Papers With Code | papers-with-code.md | REST | ✅ |
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `arxiv` | ArXiv (see also arxiv-categories.md) | arxiv.md | XML | ✅ |
+| `semantic-scholar` | Semantic Scholar | semantic-scholar.md | REST | ✅ |
+| `papers-with-code` | Papers With Code ⚠️ **Discontinued** (use Hugging Face Papers) | papers-with-code.md | — | — |
 
-### News & Media
-| Source | File | API | Free |
-|--------|------|-----|------|
-| Tech News (Multi) | tech-news.md | WebFetch | ✅ |
-| Medium | medium.md | WebFetch | ✅ |
+### News, Media & Blogs
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `tech-news` | Tech News (Multi) | tech-news.md | WebFetch | ✅ |
+| `medium` | Medium | medium.md | WebFetch | ✅ |
+| `ai-labs` | AI Labs official blogs (OpenAI/Anthropic/Google/DeepMind/Meta/...) | ai-labs.md | WebFetch | ✅ |
+| `cloud-ai` | Cloud AI blogs (AWS/GCP/Azure) | cloud-ai.md | WebFetch | ✅ |
+| `tech-bloggers` | Tech bloggers & newsletters (Simon Willison, Latent Space, ...) | tech-bloggers.md | WebFetch | ✅ |
+| `agent-frameworks` | Agent framework blogs (LangChain/LlamaIndex/CrewAI/...) | agent-frameworks.md | WebFetch | ✅ |
 
 ### Chinese Sources (中文源)
-| Source | File | API | Free |
-|--------|------|-----|------|
-| 36氪/少数派/掘金/知乎/机器之心 | chinese-tech.md | Mixed | ✅ |
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `36kr`, `sspai`, `juejin`, `zhihu`, `jiqizhixin` | 36氪/少数派/掘金/知乎/机器之心 | chinese-tech.md | Mixed | ✅ |
+| `chinese-media` | 中文 AI 媒体 (机器之心/量子位/钛媒体/InfoQ/雷锋网...) | chinese-media.md | WebFetch | ✅ |
 
 ### Social Media
-| Source | File | API | Free |
-|--------|------|-----|------|
-| Twitter/X | twitter.md | Nitter | ✅ |
-| YouTube | youtube.md | WebFetch | ✅ |
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `twitter` | Twitter/X | twitter.md | API (paid) / Nitter ⚠️ | ⚠️ |
+| `youtube` | YouTube | youtube.md | WebFetch | ✅ |
+
+> ⚠️ Public Nitter instances are unreliable (most were shut down or rate-limited after X's 2024 API changes). Treat Nitter results as best-effort; prefer the official API if `TWITTER_BEARER_TOKEN` is set, or fall back to `tavily`/`exa` with `site:x.com {keyword}`.
 
 ### Meta Search (Recommended)
-| Source | File | API | Free |
-|--------|------|-----|------|
-| **Tavily** | tavily.md | REST | 1000/mo |
+| Name | Source | File | API | Free |
+|------|--------|------|-----|------|
+| `tavily` | **Tavily** | tavily.md | REST | 1000/mo |
+| `exa` | **Exa** (AI-native search) | exa.md | REST | 1000/mo |
 
 ## Source Groups
 
@@ -75,11 +92,12 @@ Use these shortcuts for common combinations:
 
 | Group | Sources |
 |-------|---------|
-| `--sources=code` | github, papers-with-code |
+| `--sources=code` | github (papers-with-code discontinued → Hugging Face Papers) |
 | `--sources=community` | hn, reddit, devto |
-| `--sources=academic` | arxiv, semantic-scholar, papers-with-code |
-| `--sources=news` | tavily, tech-news, medium |
-| `--sources=chinese` | 36kr, sspai, juejin, zhihu, jiqizhixin |
+| `--sources=academic` | arxiv, semantic-scholar (papers-with-code discontinued → Hugging Face Papers) |
+| `--sources=news` | tavily, exa, tech-news, medium |
+| `--sources=blogs` | ai-labs, cloud-ai, tech-bloggers, agent-frameworks |
+| `--sources=chinese` | 36kr, sspai, juejin, zhihu, jiqizhixin, chinese-media |
 | `--sources=social` | twitter, youtube, producthunt |
 | `--sources=all` | All sources |
 
@@ -108,7 +126,7 @@ Extract keyword, sources, limit, days, language from user input.
 **CRITICAL:** Search all sources in parallel using multiple tool calls in a single message.
 
 For each source:
-1. Read source instruction from `sources/{source}.md`
+1. Look up the source name in the **Name** column of the tables above and read the matching file from `sources/` (e.g. `hn` → `sources/hackernews.md`, `zhihu` → `sources/chinese-tech.md`). Do not construct `sources/{name}.md` blindly — short names like `hn`/`36kr`/`zhihu` have no file of their own. If a name is unknown, report it and skip it
 2. Execute API call or WebFetch
 3. Parse results
 
@@ -167,6 +185,7 @@ Generate `raw/aggregated.md`:
 ```bash
 # Required for full functionality
 export TAVILY_API_KEY="your-key"        # Tavily search
+export EXA_API_KEY="your-key"           # Exa search (optional)
 
 # Optional
 export YOUTUBE_API_KEY="your-key"       # YouTube API

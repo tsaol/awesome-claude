@@ -34,7 +34,7 @@ This skill generates professional documents by calling an **AWS Bedrock AgentCor
 
 1. **AWS credentials** configured (`~/.aws/credentials`, env vars, or IAM role)
 2. **AgentCore Runtime** deployed with document generation agent
-3. **Python 3.10+** with `boto3` installed
+3. **Python 3.9+** with `boto3` installed (plus `python-pptx` if you want large PPTX auto-split to merge parts locally)
 
 ### Required IAM Permissions
 
@@ -56,9 +56,9 @@ This skill generates professional documents by calling an **AWS Bedrock AgentCor
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `RUNTIME_ARN` | Yes | AgentCore Runtime ARN |
-| `AWS_REGION` | No | AWS region (default: `ap-northeast-1`) |
-
-The script also auto-loads `.env` from `~/codes/document-generation-mcp/.env` if present.
+| `AWS_REGION` | No | AWS region (fallback: `AWS_DEFAULT_REGION`, then the region embedded in `RUNTIME_ARN`, then your AWS config) |
+| `DOCGEN_S3_BUCKET` | Only with `--persist-s3` | S3 bucket the remote agent should persist output to (or pass `--s3-bucket`) |
+| `DOCGEN_ENV_FILE` | No | Path to a `.env` file to load (default: `<skill-dir>/.env`). Only loaded if it exists; real env vars take precedence |
 
 ## Quick Start
 
@@ -207,11 +207,15 @@ ls -la output/presentation.pptx
 | `--prompt` | | Document description (inline) |
 | `--prompt-file` | | Read prompt from file |
 | `--output` | `-o` | Output file path (required) |
-| `--region` | | AWS region (default: ap-northeast-1) |
+| `--region` | | AWS region (default: `$AWS_REGION`, else region from the runtime ARN) |
 | `--runtime-arn` | | AgentCore Runtime ARN |
 | `--timeout` | | Read timeout in seconds (auto-estimated if omitted) |
 | `--no-split` | | Disable auto-split for large PPTX |
 | `--max-slides-per-batch` | | Max slides per batch when splitting (default: 11) |
+| `--persist-s3` | | Ask the remote agent to also persist the output to S3 (requires a bucket) |
+| `--s3-bucket` | | S3 bucket for `--persist-s3` (default: `$DOCGEN_S3_BUCKET`) |
+
+If auto-split generates all parts but merging them fails, the script exits non-zero and lists the `*_PartN.pptx` files it kept.
 
 ## Tips for Better Results
 
@@ -249,11 +253,12 @@ export RUNTIME_ARN="arn:aws:bedrock-agentcore:ap-northeast-1:123456789:runtime/y
 python scripts/docgen.py --type pptx --prompt "..." --output out.pptx
 ```
 
-Or create a `.env` file at `~/codes/document-generation-mcp/.env`:
+Or put them in a `.env` file (`<skill-dir>/.env`, or any path via `DOCGEN_ENV_FILE`):
 
 ```
 AWS_REGION=ap-northeast-1
 RUNTIME_ARN=arn:aws:bedrock-agentcore:ap-northeast-1:123456789:runtime/your-agent-id
+DOCGEN_S3_BUCKET=my-docgen-bucket   # only needed for --persist-s3
 ```
 
 ### Empty or Failed Response
@@ -270,7 +275,7 @@ Solutions:
 ### Understanding Server Constraints
 
 The remote agent operates under these constraints:
-- **Model**: Claude Opus 4.6 (cross-region inference profile)
+- **Model**: whichever Claude model is configured on the AgentCore agent (typically a cross-region inference profile)
 - **Tool call limit**: 20 code executions maximum (warning at 19, hard-stop at 21)
 - **Conversation window**: SlidingWindowConversationManager (window=20, per_turn=True) — old messages get trimmed
 - **Base64 capture**: A hook captures file output before conversation trimming
@@ -291,7 +296,7 @@ User / Claude Code
        v
   AWS Bedrock AgentCore Runtime
        |
-       | Strands Agent + Claude Opus 4.6 + Code Interpreter
+       | Strands Agent + Claude (model configured on the agent) + Code Interpreter
        | MaxToolCallsHook (20 calls) + Base64CaptureHook
        |
        v
