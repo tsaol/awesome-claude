@@ -1,49 +1,78 @@
 name: CI
 
+# Template: copy to <repo>/.github/workflows/.
+# Checks are expected to pass; a lint/format/test failure fails the job.
+
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Space-separated list of paths to lint/format-check, relative to the repo
+  # root. Default "." checks the whole repository; narrow it (e.g. "src tests")
+  # to match your project layout.
+  PYTHON_PATHS: "."
+  # Optional requirements file installed before running tests (skipped if missing).
+  REQUIREMENTS_FILE: requirements.txt
 
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install flake8 black
+        run: pip install flake8 black
 
       - name: Check formatting with black
-        run: |
-          black --check --diff ai/ ecom/ hub/ || true
+        # PYTHON_PATHS is intentionally unquoted so it splits into multiple paths.
+        run: black --check --diff $PYTHON_PATHS
 
       - name: Lint with flake8
-        run: |
-          flake8 ai/ ecom/ hub/ --max-line-length=120 --ignore=E501,W503 || true
+        run: flake8 $PYTHON_PATHS --max-line-length=120 --extend-ignore=E501,W503
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
 
       - name: Install dependencies
         run: |
           pip install pytest
-          pip install -r ai/requirements.txt || true
+          if [ -f "$REQUIREMENTS_FILE" ]; then
+            pip install -r "$REQUIREMENTS_FILE"
+          else
+            echo "No $REQUIREMENTS_FILE found, skipping"
+          fi
 
       - name: Run tests
+        # pytest exits 5 when no tests are collected; treat only that as success.
         run: |
-          pytest --tb=short || echo "No tests found or tests failed"
+          set +e
+          pytest --tb=short
+          rc=$?
+          if [ "$rc" -eq 5 ]; then
+            echo "::warning::No tests collected"
+            exit 0
+          fi
+          exit "$rc"

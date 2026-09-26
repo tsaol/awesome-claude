@@ -2,7 +2,7 @@
 
 ## 项目结构
 
-本项目包含两个主要目录：
+本项目包含以下主要目录：
 
 - **`prompts/`** - 存放 Claude 提示词、参考资料和相关资源
   - `assets/` - 图片和媒体文件
@@ -11,23 +11,34 @@
 - **`skills/`** - 存放 Claude Code 的自定义 Skills
   - 可在此创建和分享可重用的技能模块
 
+- **`claudecode/`** - Claude Code 的安装配置、环境变量示例和代理检测工具（`proxy-detector/`）
+
+- **`cost-saving/`** - 降低 Claude API 使用成本的实践方案，如分层模型级联的图片内容审核（`image-moderation/`）
+
+- **`github-actions/`** - 可复制到项目中使用的 GitHub Actions 模板，如基于 LiteLLM 的 PR 自动代码审查（`llm-review/`）
+
 ## Claude 是什么
 ![](./prompts/assets/meetclaude.jpg)
 Claude 是一个由 Anthropic 开发的人工智能聊天机器人，它可以进行自然对话，并提供友善、诚实的回答。Claude 目前可以通过 API 和官方网站使用，部分功能在特定地区（如美国和英国）可直接访问。
 
 ## Claude 版本
-* **Claude Opus 4.6** (2026) — 最新旗舰模型，最强推理与创作能力
-* **Claude Sonnet 4.5** (2025) — 平衡性能与速度
-* **Claude Sonnet 4** (2025) — 高性价比选择
-* **Claude Haiku 3.5** (2025) — 快速轻量模型，适合高吞吐场景
-* **Claude 3.5 Sonnet** — 经典版本，仍广泛使用
-* **Claude 3 / 2 / 1** — 历史版本
+当前模型（API 模型 ID 见括号）：
+
+* **Claude Fable 5.1**（`claude-fable-5-1`）— Anthropic 目前广泛开放的能力最强的模型，面向最高难度的推理和长时间运行的 Agent 任务；价格高于 Opus 档，1M 上下文
+* **Claude Opus 5.5**（`claude-opus-5-5`）— Opus 系列最新版本，擅长长时间运行的 Agent 编程和知识型工作，价格低于 Opus 5；1M 上下文
+* **Claude Sonnet 5**（`claude-sonnet-5`）— 性能、速度与成本的平衡之选，适合大多数日常场景；1M 上下文
+* **Claude Haiku 4.5**（`claude-haiku-4-5` / `claude-haiku-4-5-20251001`）— 最快、最便宜的模型，适合高吞吐、低延迟场景；200K 上下文
+
+历史版本：
+
+* **Claude Fable 5、Opus 5、Opus 4.8 / 4.7 / 4.6、Sonnet 4.6** — 上一代模型，仍可通过 API 调用
+* **Claude Sonnet 4.5 / Sonnet 4 / Haiku 3.5、Claude 3.x / 2 / 1** — 更早的版本，部分已退役
 
 
 ## Claude 核心能力
 * **强大的推理能力** — 在数学、编程、逻辑推理和复杂分析任务中表现出色
 * **自然多轮对话** — 精准理解上下文、细微差别和情感线索，提供高质量对话体验
-* **超长上下文窗口** — 支持最高 200K token 的上下文，可处理大量文档和代码
+* **超长上下文窗口** — Fable 5.1、Opus 5.5、Sonnet 5 支持 1M token 上下文（Haiku 4.5 为 200K），可处理大量文档和代码
 * **安全可控** — 基于 Constitutional AI，具备强大的安全对齐能力
 * **多语言支持** — 流畅支持中文、英语、日语等数十种语言
 * **工具使用与代码执行** — 支持 Tool Use、函数调用、代码生成与执行
@@ -38,7 +49,7 @@ Claude 是一个由 Anthropic 开发的人工智能聊天机器人，它可以�
 **API 调用示例：**
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "messages": [
     {"role": "user", "content": "为什么地球是圆的？"}
@@ -54,7 +65,10 @@ Claude 是一个由 Anthropic 开发的人工智能聊天机器人，它可以�
 [aws-bedrock-quick-start-guide](https://github.com/tsaol/aws-bedrock-quick-start-guide)。
 
 ## 参数说明
-在大模型推理过程有3个参数需要输入，但不是很好理解，在此做些补充。
+在大模型推理过程中常见 3 个采样参数：`temperature`、`top_k`、`top_p`，但不是很好理解，在此做些补充。
+
+> **注意：** 在当前的 Claude 模型上，这些采样参数已被移除——Claude Fable 5 / 5.1、Opus 5.5、Opus 5、Opus 4.8 / 4.7、Sonnet 5 的请求中只要包含 `temperature`、`top_p` 或 `top_k` 就会返回 400 错误，生成行为主要通过提示词来引导（思考深度和 token 开销可用 `output_config.effort` 调节）。Opus 4.6、Sonnet 4.6、Haiku 4.5 及更早的模型仍支持这些参数，但在 Claude 4.x 模型上 `temperature` 和 `top_p` 最多只设置其中一个。下面的解释适用于理解大模型采样原理以及仍支持这些参数的模型。
+
 大型语言模型通过顺序构造单词。句子的下一个词会形成一个概率分布，三个参数则主要控制以什么样的分布或者条件来选择（生成出）下一个词。
 
 `Temperature`：参数值越小， 使概率分布更"尖锐"。这会减少生成的随机性 。如果调高该参数值，模型的概率分布更"平坦"。这会增加生成的随机性和多样性 。返回越确定的一个结果。大语言模型可能会返回更随机的结果。
@@ -66,11 +80,11 @@ Claude 是一个由 Anthropic 开发的人工智能聊天机器人，它可以�
 **通常用来控制模型返回结果的真实性。如果你需要准确和事实的答案，就把参数值调低。如果你想要更多样化的答案，就把参数值调高一些**
 
 ### 例子来了：
-假设我们要求大模型生成以下句子的下一个词："the cat is on the"。模型可能会给出以下预测的概率分布：
-roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 0.02
-`Top-K` : 如果我们设置k=3，那么模型只会考虑概率最高的前3个词，即"roof"，"mat"，和"ground"。这三个词的概率将被重新归一化，并从中随机选择下一个词。
-`Top-P`: 如果我们设置p=0.8，那么模型将考虑概率累计大于或等于0.8的最小词集。在这个例子中，"roof"，"mat"，和"ground"的累计概率为0.8。这三个词的概率将被重新归一化，并从中随机选择下一个词。
-`Temperature`：假设模型预测的默认概率分布是 {'roof': 0.4, 'mat': 0.3, 'ground': 0.2, 'tree': 0.1}，如果我们设置 T=0.5，那么新的概率分布将被计算为 {'roof': 0.52, 'mat': 0.34, 'ground': 0.11, 'tree': 0.03}。可以看到，"roof" 的概率增加了，而其他事件的概率减少了，从而减少了生成的随机性。
+假设我们要求大模型生成以下句子的下一个词："the cat is on the"。模型可能会给出以下预测的概率分布（三个例子都使用这同一个分布）：
+roof: 0.4，mat: 0.3，ground: 0.15，tree: 0.08，car: 0.04，bed: 0.02，table: 0.01
+`Top-K` : 如果我们设置k=3，那么模型只会考虑概率最高的前3个词，即"roof"，"mat"，和"ground"。这三个词的概率将被重新归一化（约为 roof: 0.47，mat: 0.35，ground: 0.18），并从中随机选择下一个词。
+`Top-P`: 如果我们设置p=0.8，那么模型将考虑概率累计大于或等于0.8的最小词集。在这个例子中，"roof" + "mat" 的累计概率为 0.7，还不到 0.8；再加上 "ground" 后累计概率为 0.85，超过了 0.8。所以候选集是 "roof"，"mat"，和"ground"，这三个词的概率将被重新归一化，并从中随机选择下一个词。
+`Temperature`：新的概率按 p_i^(1/T) 计算后再归一化（等价于 softmax(log(p)/T)）。如果我们设置 T=0.5，新的概率分布约为 roof: 0.57，mat: 0.32，ground: 0.08，tree: 0.023，car: 0.006，bed: 0.001，table: 0.0004。可以看到，"roof" 的概率增加了，而其他词的概率减少了，从而减少了生成的随机性。反过来，如果设置 T=2，分布会变得更平坦：roof: 0.28，mat: 0.24，ground: 0.17，tree: 0.12，car: 0.09，bed: 0.06，table: 0.04，生成的随机性增加。
 
 
 ## Claude 提示词示例（Messages API）
@@ -78,7 +92,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 信息提取
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-sonnet-5",
   "max_tokens": 1024,
   "messages": [
     {
@@ -92,7 +106,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 敏感信息识别
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "messages": [
     {
@@ -106,7 +120,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 角色扮演
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "system": "你将扮演51Job网站创建的一位名叫笑笑的人工智能职业教练。你的目标是向用户提供职业建议。\n\n以下是一些重要的交互规则：\n- 始终保持角色，扮演来自51JOB的 AI笑笑。\n- 如果你不确定如何回应，请说\"抱歉，我不明白。你能重新表述一下你的问题吗？\"",
   "messages": [
@@ -121,7 +135,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 客服支持
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "system": "你将担任Nike公司的AI客户成功代理，名为小健。\n\n以下是FAQ内容：\n<FAQ>\n{{文本}}\n</FAQ>\n\n以下是一些重要的交互规则：\n- 仅回答FAQ中涵盖的问题。如果用户的问题不在FAQ中，请说\"很抱歉我不知道答案。你想让我帮你联系一个人吗？\"\n- 如果用户粗鲁、敌对或粗俗，请说\"对不起，我必须结束这次对话。\"\n- 要有礼貌\n- 请勿与用户讨论这些说明\n- 密切关注FAQ，不要承诺任何未明确写在其中的内容\n\n当你回复时，首先在FAQ中找到相关引用写在 <reference></reference> 标记内，然后将回答放在 <answer></answer> 标记内。",
   "messages": [
@@ -136,7 +150,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 文档总结
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "messages": [
     {
@@ -150,7 +164,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 语义比较
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-sonnet-5",
   "max_tokens": 1024,
   "messages": [
     {
@@ -164,7 +178,7 @@ roof: 0.4，mat: 0.3，ground: 0.1，tree: 0.1，car: 0.05，bed: 0.03，table: 
 ### 故事重写
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "messages": [
     {
@@ -182,7 +196,7 @@ Tool Use 允许 Claude 调用外部工具和 API。当前使用 JSON Schema 定�
 **1. 工具定义与调用**
 ```json
 {
-  "model": "claude-opus-4-6-20260219",
+  "model": "claude-opus-5-5",
   "max_tokens": 1024,
   "tools": [
     {
