@@ -97,34 +97,29 @@ print(f"Errors: {results['errors']}")
 
 ### Advanced Usage with Playwright
 
+Same (synchronous) API that `scripts/browser_test.py` uses — `browser_session()` is a sync context manager and `generate_ws_headers()` is a plain call:
+
 ```python
-from bedrock_agentcore.tools.browser_client import BrowserClient
-from playwright.async_api import async_playwright
+from bedrock_agentcore.tools.browser_client import browser_session
+from playwright.sync_api import sync_playwright
 
-async def custom_test():
-    client = BrowserClient(region="us-west-2")
+def custom_test(region="us-west-2"):
+    with browser_session(region) as client:          # starts + auto-stops the session
+        ws_url, headers = client.generate_ws_headers()
 
-    session = await client.start_browser_session(
-        session_name="my-test",
-        timeout=300,
-        viewport={"width": 1920, "height": 1080}
-    )
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(ws_url, headers=headers)
+            context = browser.contexts[0]
+            page = context.pages[0] if context.pages else context.new_page()
 
-    ws_url, headers = await client.generate_ws_headers()
+            # Your custom test logic
+            page.goto("https://example.com")
+            page.click("button#submit")
+            page.wait_for_selector(".result")
 
-    async with async_playwright() as p:
-        browser = await p.chromium.connect_over_cdp(ws_url, headers=headers)
-        page = browser.contexts[0].pages[0]
+            content = page.content()
+            browser.close()
 
-        # Your custom test logic
-        await page.goto("https://example.com")
-        await page.click("button#submit")
-        await page.wait_for_selector(".result")
-
-        content = await page.content()
-        await browser.close()
-
-    await client.stop_browser_session()
     return content
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: hottrend-series
-description: Generate a single article in a hottrend series. Reads plan.md, creates context, runs full hottrend pipeline with series context injection. Phase B of series workflow.
+description: Generate a single article in a hottrend series. Reads plan.md, creates context, runs full hottrend pipeline with series context injection. Phase B of series workflow. Requires the external ai-writing repo (AI_WRITING_DIR).
 ---
 
 # Hottrend Series - 系列文章单篇生成
@@ -20,7 +20,22 @@ description: Generate a single article in a hottrend series. Reads plan.md, crea
 /hottrend-series open-source-llm 3
 ```
 
-## Prerequisites
+## Prerequisites（外部依赖）
+
+本 skill 依赖外部仓库 **ai-writing**（包含 PROMPT 文件和 `.claude/agents/` 下的 agent 定义），本仓库不包含这些文件。通过环境变量 `AI_WRITING_DIR` 指定其位置，默认 `~/code/ai-writing`：
+
+```bash
+export AI_WRITING_DIR="$HOME/code/ai-writing"   # 按实际位置修改
+```
+
+**开始执行前先检查**，缺失时立即停止并清晰提示用户，不要凭空臆造流程：
+
+```bash
+AI_WRITING_DIR="${AI_WRITING_DIR:-$HOME/code/ai-writing}"
+[ -f "$AI_WRITING_DIR/PROMPT-hottrend-series.md" ] || { echo "✗ 未找到 $AI_WRITING_DIR/PROMPT-hottrend-series.md：本 skill 需要外部 ai-writing 仓库，请 clone 后设置 AI_WRITING_DIR"; exit 1; }
+```
+
+### Series Plan
 
 必须先通过 `/hottrend-series-plan` 生成 plan.md：
 
@@ -35,7 +50,7 @@ articles/series/<series-name>/plan.md
 **执行此 skill 时，必须读取以下 PROMPT 文件，并执行「阶段 B: 单篇生成」部分：**
 
 ```
-/home/ubuntu/codes/ai-writing/PROMPT-hottrend-series.md
+$AI_WRITING_DIR/PROMPT-hottrend-series.md
 ```
 
 ### 流程概览

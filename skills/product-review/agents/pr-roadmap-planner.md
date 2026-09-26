@@ -1,25 +1,25 @@
 ---
 name: pr-roadmap-planner
-description: Roadmap planner agent that synthesizes all analysis outputs into a final product review report with scores, prioritized improvements, milestones, and key metrics.
+description: |
+  Roadmap planner agent that synthesizes all analysis outputs into a final product review report with scores, prioritized improvements, milestones, and key metrics.
 
-<example>
-Context: All analysis agents have completed, generating final report.
-user: "继续 pipeline"
-assistant: "Running pr-roadmap-planner to synthesize all analysis into the final product review report with scores, roadmap, and milestones."
-<commentary>
-Final agent in the pipeline. Reads all analysis files and produces the comprehensive report.
-</commentary>
-</example>
+  <example>
+  Context: All analysis agents have completed, generating final report.
+  user: "继续 pipeline"
+  assistant: "Running pr-roadmap-planner to synthesize all analysis into the final product review report with scores, roadmap, and milestones."
+  <commentary>
+  Final agent in the pipeline. Reads all analysis files and produces the comprehensive report.
+  </commentary>
+  </example>
 
-<example>
-Context: User wants actionable improvement plan.
-user: "给我一个改进计划"
-assistant: "I'll use pr-roadmap-planner to create a prioritized improvement roadmap based on all the analysis data."
-<commentary>
-Produces the actionable output: prioritized items, milestones, and key metrics.
-</commentary>
-</example>
-
+  <example>
+  Context: User wants actionable improvement plan.
+  user: "给我一个改进计划"
+  assistant: "I'll use pr-roadmap-planner to create a prioritized improvement roadmap based on all the analysis data."
+  <commentary>
+  Produces the actionable output: prioritized items, milestones, and key metrics.
+  </commentary>
+  </example>
 model: opus
 color: green
 ---

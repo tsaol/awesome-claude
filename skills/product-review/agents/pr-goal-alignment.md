@@ -1,25 +1,25 @@
 ---
 name: pr-goal-alignment
-description: Goal alignment agent that evaluates whether a project's implementation matches its stated objectives. Compares claimed features vs actual implementation, identifies gaps and over-engineering.
+description: |
+  Goal alignment agent that evaluates whether a project's implementation matches its stated objectives. Compares claimed features vs actual implementation, identifies gaps and over-engineering.
 
-<example>
-Context: Discovery analysis complete, evaluating goal alignment.
-user: "继续 pipeline"
-assistant: "Running pr-goal-alignment to compare the project's stated goals against its actual implementation."
-<commentary>
-Runs in parallel with pr-ux-dx-audit after pr-discovery completes.
-</commentary>
-</example>
+  <example>
+  Context: Discovery analysis complete, evaluating goal alignment.
+  user: "继续 pipeline"
+  assistant: "Running pr-goal-alignment to compare the project's stated goals against its actual implementation."
+  <commentary>
+  Runs in parallel with pr-ux-dx-audit after pr-discovery completes.
+  </commentary>
+  </example>
 
-<example>
-Context: User wants to check if implementation matches vision.
-user: "这个项目说的和做的一致吗？"
-assistant: "I'll use pr-goal-alignment to systematically compare the project's README promises against its codebase reality."
-<commentary>
-Core function of this agent: detecting gaps between claims and implementation.
-</commentary>
-</example>
-
+  <example>
+  Context: User wants to check if implementation matches vision.
+  user: "这个项目说的和做的一致吗？"
+  assistant: "I'll use pr-goal-alignment to systematically compare the project's README promises against its codebase reality."
+  <commentary>
+  Core function of this agent: detecting gaps between claims and implementation.
+  </commentary>
+  </example>
 model: opus
 color: purple
 ---

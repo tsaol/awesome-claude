@@ -1,12 +1,11 @@
 ---
-inclusion: manual
+name: reveal-ppt
+description: Generate a reveal.js presentation (single HTML file, reveal.js loaded from CDN) with a polished brand theme, slide/fade/zoom transitions, vertical sub-slides, presenter mode (speaker notes window), highlight.js code blocks and built-in ?print-pdf export; also converts .pptx to reveal.js. Use when the user asks for a reveal.js deck or a "professional" tech-talk presentation that needs those framework features and network access is available. Prefer html-ppt for offline / zero-dependency one-shot decks, and beautiful-hackathon-slides for hackathon / demo-day pitch decks.
 ---
 
 # Reveal.js PPT Skill
 
-> Invoke with `#reveal-ppt` + your topic. Generates a reveal.js presentation with Amazon brand theme.
->
-> Reference: `GlobalOperation/growth/framework-comparison/reveal-demo/index.html`
+> Invoke with `/reveal-ppt` (or `#reveal-ppt`) + your topic. Generates a reveal.js presentation with Amazon brand theme.
 
 ---
 

@@ -9,20 +9,26 @@ import asyncio
 import sys
 import json
 
-# Auto-install dependencies if missing
+# Check dependencies and fail with a clear message (never auto-install)
 def ensure_dependencies():
-    required = ["bedrock_agentcore", "playwright", "nest_asyncio", "boto3"]
+    required = {  # import name -> pip package name
+        "bedrock_agentcore": "bedrock-agentcore",
+        "playwright": "playwright",
+        "nest_asyncio": "nest-asyncio",
+        "boto3": "boto3",
+    }
     missing = []
-    for pkg in required:
+    for module, package in required.items():
         try:
-            __import__(pkg.replace("-", "_"))
+            __import__(module)
         except ImportError:
-            missing.append(pkg.replace("_", "-"))
+            missing.append(package)
 
     if missing:
-        print(f"Installing missing dependencies: {', '.join(missing)}")
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing + ["-q"])
+        print(f"Error: missing Python dependencies: {', '.join(missing)}", file=sys.stderr)
+        print("Install them with:", file=sys.stderr)
+        print(f"  {sys.executable} -m pip install {' '.join(missing)}", file=sys.stderr)
+        sys.exit(2)
 
 ensure_dependencies()
 

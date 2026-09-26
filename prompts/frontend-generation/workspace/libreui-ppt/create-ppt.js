@@ -1,10 +1,10 @@
 const pptxgen = require('pptxgenjs');
-const html2pptx = require('/home/ubuntu/.claude/skills/pptx/scripts/html2pptx');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const WORKSPACE = '/home/ubuntu/codes/awesome-claude/prompts/frontend-generation/workspace/libreui-ppt';
+// Output directory: defaults to this script's directory, override with WORKSPACE env var
+const WORKSPACE = process.env.WORKSPACE || __dirname;
 
 // Create gradient background PNG
 async function createGradientBg(filename) {

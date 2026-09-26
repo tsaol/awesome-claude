@@ -1,6 +1,6 @@
 ---
 name: hottrend-series-plan
-description: Plan a series of hottrend articles. Interactive discussion to research topic, propose structure, and generate plan.md. Phase A of the series workflow.
+description: Plan a series of hottrend articles. Interactive discussion to research topic, propose structure, and generate plan.md. Phase A of the series workflow. Requires the external ai-writing repo (AI_WRITING_DIR).
 ---
 
 # Hottrend Series Plan - 系列热点文章规划
@@ -20,12 +20,27 @@ description: Plan a series of hottrend articles. Interactive discussion to resea
 /hottrend-series-plan "开源 vs 闭源 LLM"
 ```
 
+## Prerequisites（外部依赖）
+
+本 skill 依赖外部仓库 **ai-writing**（包含 PROMPT 文件），本仓库不包含这些文件。通过环境变量 `AI_WRITING_DIR` 指定其位置，默认 `~/code/ai-writing`：
+
+```bash
+export AI_WRITING_DIR="$HOME/code/ai-writing"   # 按实际位置修改
+```
+
+**开始执行前先检查**，缺失时立即停止并清晰提示用户，不要凭空臆造流程：
+
+```bash
+AI_WRITING_DIR="${AI_WRITING_DIR:-$HOME/code/ai-writing}"
+[ -f "$AI_WRITING_DIR/PROMPT-hottrend-series.md" ] || { echo "✗ 未找到 $AI_WRITING_DIR/PROMPT-hottrend-series.md：本 skill 需要外部 ai-writing 仓库，请 clone 后设置 AI_WRITING_DIR"; exit 1; }
+```
+
 ## Execution
 
 **执行此 skill 时，必须读取以下 PROMPT 文件，并执行「阶段 A: 系列规划」部分：**
 
 ```
-/home/ubuntu/codes/ai-writing/PROMPT-hottrend-series.md
+$AI_WRITING_DIR/PROMPT-hottrend-series.md
 ```
 
 ### 流程概览

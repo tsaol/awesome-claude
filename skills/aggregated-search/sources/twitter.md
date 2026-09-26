@@ -16,7 +16,9 @@ curl -s "https://api.twitter.com/2/tweets/search/recent?query={keyword}&max_resu
   }'
 ```
 
-## Alternative: Nitter (Free)
+## Alternative: Nitter (Free, ⚠️ Unreliable)
+
+> ⚠️ Public Nitter instances are unreliable: most were shut down or are heavily rate-limited since X's 2024 API/guest-account changes, and the instances below may be offline. Treat Nitter as best-effort only. Alternatives: the official API (above), or Tavily/Exa with `site:x.com {keyword}`.
 
 Use Nitter instances for public tweets:
 
@@ -25,7 +27,7 @@ WebFetch: https://nitter.net/search?f=tweets&q={keyword}
 Prompt: Extract tweets with author, text, date, likes, retweets. Return as markdown.
 ```
 
-## Nitter Instances
+## Nitter Instances (may be offline)
 
 | Instance | URL |
 |----------|-----|
@@ -73,5 +75,5 @@ Prompt: Extract tweets with author, text, date, likes, retweets. Return as markd
 ## Notes
 
 - Official API is expensive
-- Nitter may have availability issues
+- Public Nitter instances are unreliable / often offline — do not depend on them
 - Consider using Tavily for Twitter content

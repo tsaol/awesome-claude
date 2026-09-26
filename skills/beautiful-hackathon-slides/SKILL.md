@@ -1,6 +1,6 @@
 ---
 name: beautiful-hackathon-slides
-description: Create distinctive, production-grade hackathon demo decks with bold design choices that stand out from typical technical presentations. Use when building pitch decks for hackathons, demo days, or competition submissions that need to combine technical depth with visual polish.
+description: Create distinctive, production-grade hackathon demo decks with bold design choices that stand out from typical technical presentations. Use when building pitch decks for hackathons, demo days, or competition submissions that need to combine technical depth with visual polish. For general-purpose HTML decks use html-ppt (offline, zero-dependency) or reveal-ppt (reveal.js features) instead.
 ---
 
 # Beautiful Hackathon Slides

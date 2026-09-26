@@ -1,25 +1,25 @@
 ---
 name: pr-ux-dx-audit
-description: UX/DX audit agent that evaluates user experience and developer experience quality. Assesses first-use experience, README quality, API/CLI design, documentation coverage, and identifies experience pain points.
+description: |
+  UX/DX audit agent that evaluates user experience and developer experience quality. Assesses first-use experience, README quality, API/CLI design, documentation coverage, and identifies experience pain points.
 
-<example>
-Context: Discovery analysis complete, auditing experience quality.
-user: "继续 pipeline"
-assistant: "Running pr-ux-dx-audit to evaluate the project's user and developer experience quality."
-<commentary>
-Runs in parallel with pr-goal-alignment after pr-discovery completes.
-</commentary>
-</example>
+  <example>
+  Context: Discovery analysis complete, auditing experience quality.
+  user: "继续 pipeline"
+  assistant: "Running pr-ux-dx-audit to evaluate the project's user and developer experience quality."
+  <commentary>
+  Runs in parallel with pr-goal-alignment after pr-discovery completes.
+  </commentary>
+  </example>
 
-<example>
-Context: User wants to assess developer experience.
-user: "这个项目的开发者体验怎么样？"
-assistant: "I'll use pr-ux-dx-audit to audit the installation flow, documentation quality, API design, and first-use experience."
-<commentary>
-When focus is on DX, this agent deep-dives into developer-facing aspects.
-</commentary>
-</example>
-
+  <example>
+  Context: User wants to assess developer experience.
+  user: "这个项目的开发者体验怎么样？"
+  assistant: "I'll use pr-ux-dx-audit to audit the installation flow, documentation quality, API design, and first-use experience."
+  <commentary>
+  When focus is on DX, this agent deep-dives into developer-facing aspects.
+  </commentary>
+  </example>
 model: opus
 color: orange
 ---
