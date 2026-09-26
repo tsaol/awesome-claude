@@ -1,6 +1,6 @@
 ---
 name: aphorism
-description: Aphorism (金句/随想) micro-post pipeline for Toutiao. Distills this week's news (whatsnew daily reports in S3) into structural insights, generates candidates with 3 models in parallel (Opus, Kimi K2.5, DeepSeek V3.2), then critic, refiner, de-AI, and publishes micro-posts only after user confirmation. Requires the external toutiao repo (TOUTIAO_DIR).
+description: Aphorism (金句/随想) micro-post pipeline for Toutiao. Distills this week's news (whatsnew daily reports in S3) into structural insights, generates candidates with 3 models in parallel (Opus 5.5, Kimi K3, DeepSeek V3.2), then critic, refiner, de-AI, and publishes micro-posts only after user confirmation. Requires the external toutiao repo (TOUTIAO_DIR).
 ---
 
 # Aphorism - 金句/随想微头条
@@ -33,7 +33,7 @@ export TOUTIAO_DIR="$HOME/code/toutiao"   # 按实际位置修改
   ```bash
   cd "$TOUTIAO_DIR" && git archive "$(git log --all --format=%H -1 -- eval/clients.py)^" eval | tar -x
   ```
-- 一个装了 `boto3` 的 Python，以及 AWS 凭证：能调用 Bedrock（us-east-1）上 Opus / Kimi K2.5 / DeepSeek V3.2，能读 `s3://cls-whatsnew`（whatsnew 日报，可用 `WHATSNEW_S3_BUCKET` 改）。
+- 一个装了 `boto3` 的 Python，以及 AWS 凭证：能调用 Bedrock（us-east-1）上 Opus 5.5 (`us.anthropic.claude-opus-5-5`) / Kimi K3 (`us.moonshotai.kimi-k3`) / DeepSeek V3.2，能读 `s3://cls-whatsnew`（whatsnew 日报，可用 `WHATSNEW_S3_BUCKET` 改）。
 
 **开始执行前先检查**，缺失时立即停止并清晰提示用户，不要凭空臆造流程：
 
@@ -69,7 +69,7 @@ $TOUTIAO_DIR/PROMPT-aphorism.md
 Step 1:   创建目录 articles/YYYYMMDD-HHMMSS-aphorism/
 Step 1.5: fetch_s3_weekly.py (不足 5 篇则 WebSearch) → process/weekly_news.md
 Step 1.6: aphorism-distiller(Opus)            → process/weekly_insights.md (5-8 条洞察+事件锚点)
-Step 2:   aphorism-gen x3 并行 (Opus/Kimi/DeepSeek) → raw/candidates.md (24-36 条)
+Step 2:   aphorism-gen x3 并行 (Opus 5.5/Kimi K3/DeepSeek) → raw/candidates.md (24-36 条)
 Step 3:   aphorism-critic(Opus, 按模型三批并行) → process/critique.md (PASS/REFINE/KILL)
 Step 4:   aphorism-refiner(Opus)              → output/v1_draft.md
 Step 5:   toutiao-deai(Opus)                  → output/v3_final.md
