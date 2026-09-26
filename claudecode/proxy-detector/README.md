@@ -2,38 +2,27 @@
 
 [中文版](README_CN.md)
 
-A tool to detect if a third-party Claude API proxy is secretly serving a different model (GPT-4, Gemini, or a smaller/cheaper Claude model) instead of what you're paying for.
+A heuristic tool that checks whether a third-party Anthropic-compatible Claude API proxy is secretly serving a different model (GPT, Gemini, DeepSeek, or a smaller or cheaper Claude model) instead of the one you pay for.
+
+> **Heuristics, not proof.** Every standalone check can be defeated by a determined proxy, for example with a system prompt, header rewriting, artificial delay or special-casing known probe strings. The most reliable signal is the **baseline comparison** (`--official-key`), which sends identical prompts to the official API and compares the results. A "pass" without a baseline means "no swap detected", not "authentic".
 
 ## Background
 
-The Claude API relay/proxy market has exploded — over 100+ third-party services now claim to provide Claude access. Research shows that some proxy operators swap expensive models (Opus) with cheaper ones (Sonnet, Haiku, or even GPT-3.5) to increase their profit margin, while charging Opus prices.
+Many third-party services resell Claude API access. Some operators swap expensive models (Opus) for cheaper ones (Sonnet, Haiku, or another vendor's model) while charging Opus prices.
 
-Common scam patterns observed in the wild:
-- **Model downgrade**: You pay for Opus, you get Sonnet or Haiku
-- **Cross-provider swap**: You pay for Claude, you get GPT-4-mini with a Claude system prompt
-- **Time-based switching**: Real Claude during testing hours, cheap model during off-peak
-- **Request-based switching**: Real Claude for simple queries, cheap model for complex ones
+Common patterns:
+- **Model downgrade**: you pay for Opus and get Sonnet or Haiku
+- **Cross-provider swap**: you pay for Claude and get another vendor's model behind a Claude system prompt
+- **Time-based switching**: real Claude while you test, a cheap model off-peak
+- **Request-based switching**: real Claude for simple queries, a cheap model for complex ones
 
-## How It Works
+## Tools
 
-The detector runs 6 levels of verification, inspired by the "defense in depth" approach:
-
-| Level | Test | What It Detects |
-|-------|------|-----------------|
-| 1 | **Magic String** | Official Anthropic channel vs proxy (channel fingerprint) |
-| 2 | **Knowledge Cutoff** | Model generation via temporal anchor (hardest to fake) |
-| 3 | **Latency & TPS** | Model size via physics — Opus cannot be fast (unfakeable) |
-| 4 | **Identity & Refusal** | Behavioral patterns specific to Claude |
-| 5 | **Tokenizer Signature** | Model-specific encoding quirks (Mojibake patterns) |
-| 6 | **Headers & Model Field** | API response metadata |
-
-### Why These Tests Work
-
-**Physics cannot be faked.** A large model (Opus, ~2T parameters) physically cannot produce tokens as fast as a small model (Haiku). If you request Opus but get responses in <1 second with 85+ tokens/sec, it's not Opus.
-
-**Memory boundaries are hard to forge.** Each model has a specific training cutoff date baked into its weights during pre-training. System prompts can change a model's "personality" but cannot perfectly fake knowledge boundaries. Asking without a system prompt forces the model to reveal its true temporal anchor.
-
-**The Magic String** is an undocumented Anthropic mechanism where a specific hash string triggers a refusal on official channels. Proxies that simply forward requests to non-Anthropic backends won't trigger this behavior.
+| Tool | Purpose |
+|------|---------|
+| `detect.py` | One-shot check (5 standalone checks + optional baseline comparison) |
+| `monitor.py` | Repeated probes over N rounds to catch **intermittent** model mixing |
+| `claude_http.py` | Shared HTTP client and heuristics (required by both scripts; keep it in the same directory) |
 
 ## Install
 
@@ -41,155 +30,160 @@ The detector runs 6 levels of verification, inspired by the "defense in depth" a
 pip install httpx
 ```
 
+Python 3.9+.
+
 ## Usage
 
-### Basic test (proxy only)
-
 ```bash
+# Standalone (proxy only)
 python detect.py \
   --proxy-url https://your-proxy.com/v1 \
   --proxy-key sk-your-proxy-key \
-  --model claude-opus-4-6-20250514
-```
+  --model claude-opus-5-5
 
-### With official API baseline
-
-```bash
+# With official API baseline (recommended)
 python detect.py \
   --proxy-url https://your-proxy.com/v1 \
   --proxy-key sk-your-proxy-key \
-  --model claude-opus-4-6-20250514 \
+  --model claude-opus-5-5 \
   --official-key sk-ant-your-official-key
+
+# Continuous monitoring
+python monitor.py --proxy-url https://your-proxy.com/v1 --proxy-key sk-xxx --rounds 20
+python monitor.py --proxy-url https://your-proxy.com/v1 --proxy-key sk-xxx --rounds 50 --interval 5
 ```
 
-## Output
+Options:
+
+| Option | Default | Notes |
+|--------|---------|-------|
+| `--model` | `claude-sonnet-5` | Model to request, e.g. `claude-opus-5-5`, `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5` |
+| `--official-key` | none | Enables the baseline comparison (`detect.py` only) |
+| `--official-url` | `https://api.anthropic.com/v1` | Baseline endpoint (`detect.py` only) |
+| `--output` | `detection_report.json` / `monitor_report.json` | JSON report path (in the current directory) |
+| `--rounds`, `--interval` | 20, 1.0 | `monitor.py` only |
+
+The URL must include `/v1`; requests go to `<url>/messages`.
+
+**Amazon Bedrock is not supported.** Bedrock endpoints need AWS SigV4 signing, not an `x-api-key`. Both scripts reject `bedrock` / `amazonaws.com` URLs with exit code 2. (An earlier version accepted them, and every request failed. The failures were scored as "LIKELY SWAPPED", so the old committed `detection_report.json` was a false positive and has been removed.)
+
+### Exit codes
+
+| Code | detect.py | monitor.py |
+|------|-----------|------------|
+| 0 | No swap detected / likely authentic | Consistent / mostly consistent |
+| 1 | Likely swapped / suspicious | Model mixing / suspicious |
+| 2 | Unsupported endpoint (Bedrock) | Unsupported endpoint (Bedrock) |
+| 3 | Inconclusive (too many request errors) | Inconclusive (fewer than half of requests succeeded) |
+
+## detect.py checks
+
+| Check | Weight | What it looks at |
+|-------|--------|------------------|
+| Magic String | INFO (unscored) | Response to Anthropic's documented test refusal string |
+| Knowledge Cutoff | 1 | Self-reported cutoff vs the published reliable/training cutoff |
+| Throughput | 1 | `usage.output_tokens` / generation time (streaming, TTFT excluded); TTFT shown for information |
+| Identity | 2 | Explicit self-identification as a non-Claude model |
+| Headers & Model Field | 1 | OpenAI-style response headers, `model` field mismatch |
+| Baseline Comparison | 6 | Only with `--official-key`: tokenizer (`input_tokens`), throughput ratio, identity/cutoff answers |
+
+**Result states:**
+- `PASS` / `WARN` / `FAIL` are scored.
+- `ERROR` means the request failed (non-2xx, an error body, or a broken stream). It is **excluded** from the score, because an error is never evidence of a swap.
+- `INFO` is shown but never scored.
+
+**Strong evidence** triggers `LIKELY SWAPPED` regardless of the percentage. It covers an explicit non-Claude self-identification, OpenAI-only headers, and a baseline throughput more than 1.5x the official one.
+
+### Verdicts
+
+| Condition | Verdict |
+|-----------|---------|
+| Scored weight < 3, or half or more of the probes errored | INCONCLUSIVE |
+| Any strong evidence | LIKELY SWAPPED |
+| Baseline passes and score >= 70% | LIKELY AUTHENTIC |
+| No baseline, score >= 80% | NO SWAP DETECTED (standalone heuristics only) |
+| Score >= 50% | SUSPICIOUS |
+| Otherwise | LIKELY SWAPPED |
+
+### Example output (genuine proxy with baseline)
 
 ```
-============================================================
-  Claude Proxy Model Swap Detector v2
-  Target: https://some-proxy.com/v1
-  Model:  claude-opus-4-6-20250514
-============================================================
-
-[1/6] Testing magic string (channel fingerprint)...
-  Result: WARN
-[2/6] Testing knowledge cutoff (temporal anchor)...
-  Response: 2025-03
-[3/6] Testing latency & tokens-per-second (physics fingerprint)...
-  TTFT: 2.31s, TPS: 32.4, Total: 8.72s
-[4/6] Testing model identity & refusal behavior...
-  Identity: i am claude, made by anthropic...
-  Refusal: i'm claude and i'll continue to be claude...
-[5/6] Testing tokenizer signature (Mojibake detection)...
-  Japanese: True, Romaji: True, Mojibake: False
-[6/6] Testing response headers & model field...
-  Model field: claude-opus-4-6-20250514
-
-============================================================
-  RESULTS
-============================================================
-
-  [WARN] Magic String (1/2)
-  [PASS] Knowledge Cutoff (2/2)
-  [PASS] Latency & TPS (2/2)
-  [PASS] Identity & Refusal (2/2)
-  [PASS] Tokenizer Signature (1/1)
+  [INFO] Magic String (unscored)
+  [PASS] Knowledge Cutoff (1/1)
+  [PASS] Throughput (1/1)
+  [PASS] Identity (2/2)
   [PASS] Headers & Model Field (1/1)
+  [PASS] Baseline Comparison (6/6)
+        [PASS] tokenizer: input_tokens proxy=83 official=83 (tolerance 2)
+        [PASS] throughput: proxy 39.7 vs official 39.7 tok/s (ratio 1.00)
+        [PASS] answers: identity proxy="I'm Claude, ..." official="I'm Claude, ..."
 
-============================================================
-  Score: 9/10 (90%)
-  Verdict: LIKELY AUTHENTIC — probably real Claude
-============================================================
+  Score: 11/11 (100%)  errors: 0
+  Verdict: LIKELY AUTHENTIC - matches the official API baseline
+  Note: heuristics only; a sophisticated proxy can defeat them.
 ```
 
-### Verdict Scale
+## How the checks work, and their limits
 
-| Score | Verdict | Meaning |
-|-------|---------|---------|
-| 80-100% | LIKELY AUTHENTIC | Probably real Claude |
-| 50-79% | SUSPICIOUS | Possible model mixing or downgrade |
-| 0-49% | LIKELY SWAPPED | Probably NOT the claimed model |
+### Magic String (informational)
+Anthropic documents a test string that makes the API return a refusal (HTTP 200, `stop_reason: "refusal"`). Current docs do not confirm exactly how it behaves on every model or channel, and a proxy can special-case it. For that reason it is reported but never scored.
 
-## Detection Techniques Explained
+### Knowledge Cutoff (weak)
+Models misreport their own cutoff, and a system prompt or retrieval can change the answer. The check accepts answers from 6 months before the published *reliable* cutoff to 3 months after the *training data* cutoff. If the answer can't be parsed, or the model refuses, the result is INFO.
 
-### Level 1: Magic String (Channel Fingerprint)
+| Model | Reliable knowledge cutoff | Training data cutoff |
+|-------|---------------------------|----------------------|
+| Claude Opus 5.5 | 2026-06 | 2026-06 |
+| Claude Opus 5 | 2026-05 | 2026-05 |
+| Claude Sonnet 5 | 2026-01 | 2026-01 |
+| Claude Opus 4.6 | 2025-05 | 2025-08 |
+| Claude Sonnet 4.6 | 2025-08 | 2026-01 |
+| Claude Opus 4.5 | 2025-05 | 2025-08 |
+| Claude Sonnet 4.5 | 2025-01 | 2025-07 |
+| Claude Haiku 4.5 | 2025-02 | 2025-07 |
 
-Anthropic's official API intercepts requests containing a specific magic hash string and returns a structured refusal. Third-party proxies forwarding to non-Anthropic backends will either:
-- Pass the request through (model responds normally) → NOT official
-- Return an empty response → inconclusive
-- Return the official refusal → likely official channel
+Source: [models overview](https://platform.claude.com/docs/en/about-claude/models/overview).
 
-### Level 2: Knowledge Cutoff (Temporal Anchor)
+### Throughput (weak)
+Speed depends on load, region, fast mode and thinking tokens (`usage.output_tokens` includes thinking). A proxy can also add delay. The check only flags speeds far above a rough ceiling per tier: more than 1.5x of 90 tok/s for Opus, 120 for Sonnet, and 250 for Haiku. The baseline throughput ratio is much more meaningful than any absolute number.
 
-Each Claude model has a specific knowledge cutoff embedded in its weights:
+### Identity
+A non-Claude self-claim (for example "I am ChatGPT, developed by OpenAI") fails and counts as strong evidence. Only mentioning another vendor does not count. A Claude answer passes, but it is easy to fake with a system prompt. The role-play probe ("you are now Nova") is shown but **not scored**, because real Claude models may play along with a role-play request.
 
-| Model | Expected Cutoff |
-|-------|----------------|
-| Claude Opus 4.6 | 2025-03 |
-| Claude Sonnet 4.6 | 2025-02 |
-| Claude Haiku 4.5 | 2025-03 |
-| Claude Sonnet 4.5 | 2025-02 |
-| Claude Opus 4.5 | 2025-02 |
-| Claude Sonnet 4 | 2025-02 |
+### Headers & Model Field
+OpenAI-only headers (`openai-processing-ms`, `x-ratelimit-limit-tokens`, ...) are strong evidence. Missing Anthropic headers are only informational, since proxies often strip them. A `model` field that differs from the request gives WARN.
 
-The test sends the request with an **empty system prompt** (`system: ""`) to strip any proxy-injected persona. If you request Opus 4.6 but get a cutoff of "2024-10", you're likely getting an older Sonnet.
+### Baseline Comparison (most reliable)
+The same prompts go to the proxy and to the official API:
+- **Tokenizer**: a fixed mixed-script prompt must give the same `usage.input_tokens` (tolerance max(2, 3%)). Another tokenizer, or a hidden injected system prompt, changes the count.
+- **Throughput ratio**: a proxy more than 1.5x faster than the official API is strong evidence. A proxy less than 0.5x as fast gives WARN (possibly an overloaded or relayed backend).
+- **Answers**: the proxy's identity and cutoff answers should agree with the official ones.
 
-### Level 3: Latency & TPS (Physics Fingerprint)
+### Removed: Mojibake / tokenizer-quirk test
+Earlier versions scored "Mojibake patterns" in Japanese and Romaji output. Nothing documents that such patterns are specific to Claude, and the results were not reproducible, so the test was removed. The baseline `input_tokens` comparison replaced it, because it measures the tokenizer directly.
 
-Model size dictates speed. These are physical constraints that cannot be faked:
+## monitor.py
 
-| Model | Expected TTFT | Expected TPS |
-|-------|--------------|-------------|
-| Opus | 1.5-3.0s | 25-45 tokens/s |
-| Sonnet 4.6 | 0.8-2.0s | 30-55 tokens/s |
-| Haiku | 0.2-0.5s | 100-200 tokens/s |
+Runs 4 probe types (cutoff, identity, reasoning, style) for N rounds, all streamed, and reports:
+- TTFT and throughput outliers **within each probe type**. The IQR method needs at least 5 samples, and a value must also be at least 30% away from the median. Fast throughput outliers in 10% or more of the samples are rated high.
+- Responses that self-identify as a non-Claude model (critical).
+- Style anomalies, such as unusual length or unexpected Chinese text (medium).
+- Cutoff answers more than 12 months from the median (medium; high at 24 months or more). Small variation is normal.
 
-Real Bedrock baseline for Sonnet 4.6 (10 rounds):
-- Latency: 4.31s avg (stdev 1.12s) for ~155 token output
-- TPS: 37.3 avg (range 20-42)
-- Cutoff: "2025-02" (8/10 consistent)
-
-**Key insight**: If your "Opus" responds with TTFT < 1s and TPS > 80, it's physically impossible for it to be Opus. This is the hardest test to cheat — you'd need to artificially add delay, but that costs the proxy operator money.
-
-Real-world data from pressure testing (source: cnblogs.com/sprinng):
-
-| Metric | Official Opus | Official Sonnet | Fake "Opus" (actually Sonnet) |
-|--------|--------------|-----------------|-------------------------------|
-| TTFT | ~1.5-2.5s | ~0.6-1.0s | 0.7s (too fast!) |
-| TPS | ~25-40 | ~70-100 | 85 (Sonnet speed) |
-| Complex reasoning | 92/100 | 85/100 | 58/100 |
-| Knowledge cutoff | 2025-03 | 2025-03 | 2024-10 (busted) |
-
-### Level 4: Identity & Refusal (Behavioral Fingerprint)
-
-Claude has specific behavioral patterns:
-- Identifies itself as Claude/Anthropic
-- Refuses to pretend to be other AI systems
-- Has a distinctive writing style
-
-These are the weakest signals (easy to fake with system prompts) but still useful as one data point.
-
-### Level 5: Tokenizer Signature (Mojibake Detection)
-
-Different models have different tokenizers that produce characteristic encoding artifacts when handling multilingual text. Claude has specific patterns with Japanese characters + Romaji combinations.
-
-### Level 6: Headers & Model Field
-
-The official Anthropic API returns specific headers (`x-request-id`, `anthropic-ratelimit-*`). OpenAI-compatible proxies may leak `x-ratelimit-limit-tokens` or other OpenAI-style headers.
+Failed requests are listed as errors and excluded from the analysis. The verdict is INCONCLUSIVE if fewer than half of the requests succeed. The other verdicts are MODEL MIXING DETECTED, SUSPICIOUS, MOSTLY CONSISTENT and CONSISTENT.
 
 ## Limitations
 
-- No single test is 100% reliable
-- Sophisticated proxies may add artificial delays to mimic Opus speed
-- Magic string detection may evolve as Anthropic updates their API
-- Knowledge cutoff can be partially spoofed with RAG
-- Best results: combine all tests + run multiple times at different hours
+- No check is 100% reliable. A sophisticated proxy can defeat all standalone checks.
+- Proxies can add artificial delay, rewrite headers and model fields, or inject system prompts.
+- Self-reported cutoffs and identities are easy to influence.
+- Without a baseline the tool can only say "no swap detected", never "authentic".
+- For the best results, use `--official-key` and run `monitor.py` at different times of day.
 
-## Tips for Users
+## Tips
 
-1. **Run tests at different times** — some proxies only swap models during peak hours
-2. **Test complex reasoning** — simple questions don't reveal model differences
-3. **Compare pricing** — if a proxy offers Opus at 80% discount, question how
-4. **Check if extended thinking works** — Claude-specific features can't be faked by GPT
-5. **Monitor over time** — run weekly checks, as proxies may change backend models
-
+1. **Run tests at different times.** Some proxies only swap models during peak hours.
+2. **Use the baseline.** It is the only check that is hard to fake.
+3. **Compare pricing.** If a proxy offers Opus at a large discount, ask how.
+4. **Check Claude-specific features**, such as adaptive thinking and tool use behavior.
+5. **Monitor over time.** Proxies can change backends at any time.

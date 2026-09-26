@@ -26,7 +26,7 @@ When the user communicates, ALWAYS:
    - If CORRECT: Say "correct." Then log and proceed to execute.
    - If INCORRECT: Point out the errors, provide the correct expression, and briefly explain. **DO NOT execute the user's request.** Ask the user to input the correct English first. Only after the user provides a corrected sentence that passes the check can you proceed to execute.
 5. Suggest Improvements: More natural/idiomatic expressions
-6. Log the check result to ~/english.log using Python (auto-approved):
+6. Log the check result to ~/english.log using Python:
    ```
    python3 -c "import datetime, os; open(os.path.expanduser('~/english.log'), 'a').write(f'[{datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")}] Original: [user\\'s text] | Status: [Correct/Incorrect] | Corrected: [corrected version or N/A] | Idiomatic: [more natural expression] | Explanation: [brief explanation] | Pattern: [key sentence patterns] | Tense: [tense used]\\n')"
    ```
