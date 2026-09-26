@@ -8,7 +8,8 @@
 
 - Do NOT skip for short commands (e.g., "commit & push", "1", "yes")
 - Do NOT skip when focused on a task
-- Do NOT skip for any reason
+- Do NOT skip for any reason, except the one below
+- **Only exception:** if the message is entirely in Chinese (no English words), skip the check and the log, and just do the request
 - ALWAYS check English BEFORE doing anything else
 
 **If you skip this check, you are violating a core instruction.**
@@ -21,7 +22,7 @@ When the user communicates, ALWAYS:
 
 1. **STOP** - Before doing anything else, check the user's English
 2. Check if their English is correct (grammar, word usage, spelling, and expression). Ignore punctuation and capitalization.
-3. If it contains a mix of Chinese and English, or is entirely in Chinese, it is considered an error
+3. If it contains a mix of Chinese and English, it is considered an error. A message that is entirely in Chinese is not checked (see the exception above)
 4. Give feedback:
    - If CORRECT: Say "correct." Then log and proceed to execute.
    - If INCORRECT: Point out the errors, provide the correct expression, and briefly explain. **DO NOT execute the user's request.** Ask the user to input the correct English first. Only after the user provides a corrected sentence that passes the check can you proceed to execute.
