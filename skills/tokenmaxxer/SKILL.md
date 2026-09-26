@@ -223,85 +223,34 @@ process to the user. Just do the thorough thing naturally.
 
 ### Component 2: Hook scripts in `.claude/hooks/tokenmaxxer/`
 
-**reflect.sh** — PostToolUse hook for self-reflection:
+The hook scripts live in this skill's `hooks/` directory, which is the single
+source of truth. Copy them verbatim — do not retype them:
 
-```bash
-#!/bin/bash
-# Tokenmaxxer: Self-reflection after code changes
-INPUT=$(cat)
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+| Script | Event | What it injects |
+|---|---|---|
+| `hooks/reflect.sh` | `PostToolUse` (matcher `Edit\|Write\|Bash`) | Self-reflection after editing a code file, running `git commit`, or running tests |
+| `hooks/aspire.sh` | `UserPromptSubmit` | Aspiration reminder on substantive prompts (>15 chars, not slash commands) |
+| `hooks/reinject.sh` | `SessionStart` (matcher `compact`) | Re-injects the identity right after context compaction |
 
-# Only reflect after meaningful code actions
-case "$TOOL_NAME" in
-  Edit|Write)
-    FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
-    # Only for code files, not configs or docs
-    if echo "$FILE_PATH" | grep -qE '\.(py|ts|tsx|js|jsx|go|rs|java)$'; then
-      cat <<REFLECT
+Each script prints a JSON object built with `jq -n` (so file paths and
+commands are always safely escaped) of the form:
+
+```json
 {
   "hookSpecificOutput": {
-    "additionalContext": "Self-reflection: You just modified ${FILE_PATH}. Before moving on, consider: Does this change have test coverage? Did you handle edge cases? Could this introduce a regression? If something is missing, address it now."
+    "hookEventName": "PostToolUse",
+    "additionalContext": "Self-reflect: ..."
   }
 }
-REFLECT
-    fi
-    ;;
-  Bash)
-    COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
-    if echo "$COMMAND" | grep -q "git commit"; then
-      cat <<REFLECT
-{
-  "hookSpecificOutput": {
-    "additionalContext": "Self-reflection: You just committed. Before moving on, consider: Did you commit everything that belongs together? Are there related improvements you noticed but haven't addressed? Is there a test you meant to add?"
-  }
-}
-REFLECT
-    fi
-    ;;
-esac
-
-exit 0
 ```
 
-**aspire.sh** — UserPromptSubmit hook for aspiration injection:
-
-```bash
-#!/bin/bash
-# Tokenmaxxer: Inject aspiration before processing user request
-INPUT=$(cat)
-PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty')
-
-# Don't inject on very short confirmations (yes/no/ok/1/2/3)
-if [ ${#PROMPT} -gt 10 ]; then
-  cat <<ASPIRE
-{
-  "hookSpecificOutput": {
-    "additionalContext": "Aspiration reminder: Approach this task with depth. If you can write tests alongside code, do it. If you can use parallel agents for independent subtasks, do it. Aim for excellent, not just done."
-  }
-}
-ASPIRE
-fi
-
-exit 0
-```
-
-**reinject.sh** — PostCompact hook to survive context compaction:
-
-```bash
-#!/bin/bash
-# Tokenmaxxer: Re-inject identity after compaction
-cat <<REINJECT
-{
-  "hookSpecificOutput": {
-    "additionalContext": "Tokenmaxxer identity re-injection: You are thorough by nature. After every code change, self-reflect on completeness. Spend tokens on review, not just generation. Use parallel agents when possible. Your standard is excellence, not just correctness."
-  }
-}
-REINJECT
-
-exit 0
-```
+`hookEventName` must match the event the hook is registered for, otherwise
+Claude Code ignores the output. Compaction survival uses `SessionStart` with
+matcher `compact` because `PostCompact` hooks cannot inject `additionalContext`.
 
 ### Component 3: Hook configuration in `.claude/settings.json`
+
+Same as `settings.example.json` in this skill:
 
 ```json
 {
@@ -312,7 +261,7 @@ exit 0
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/tokenmaxxer/reflect.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tokenmaxxer/reflect.sh",
             "timeout": 5
           }
         ]
@@ -323,18 +272,19 @@ exit 0
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/tokenmaxxer/aspire.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tokenmaxxer/aspire.sh",
             "timeout": 5
           }
         ]
       }
     ],
-    "PostCompact": [
+    "SessionStart": [
       {
+        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/tokenmaxxer/reinject.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tokenmaxxer/reinject.sh",
             "timeout": 5
           }
         ]
@@ -350,20 +300,25 @@ exit 0
 # 1. Create hook directory
 mkdir -p .claude/hooks/tokenmaxxer
 
-# 2. Write hook scripts (reflect.sh, aspire.sh, reinject.sh)
+# 2. Copy hook scripts from this skill (reflect.sh, aspire.sh, reinject.sh)
+cp <skill-dir>/hooks/*.sh .claude/hooks/tokenmaxxer/
+
 # 3. Make executable
 chmod +x .claude/hooks/tokenmaxxer/*.sh
 
 # 4. Create identity file
-# Write .claude/tokenmaxxer-identity.md
+cp <skill-dir>/tokenmaxxer-identity.md .claude/tokenmaxxer-identity.md
 
-# 5. Add include to CLAUDE.md (append if exists, create if not)
-echo "" >> CLAUDE.md
-echo "<!-- Tokenmaxxer Identity -->" >> CLAUDE.md
-echo "$(cat .claude/tokenmaxxer-identity.md)" >> CLAUDE.md
+# 5. Add identity to CLAUDE.md (create if missing; skip if already present).
+#    The identity file already contains the <!-- Tokenmaxxer Identity --> and
+#    <!-- End Tokenmaxxer --> markers used by uninstall.
+if ! grep -q "<!-- Tokenmaxxer Identity -->" CLAUDE.md 2>/dev/null; then
+  { echo ""; cat .claude/tokenmaxxer-identity.md; } >> CLAUDE.md
+fi
 
 # 6. Merge hook config into .claude/settings.json
-# (use jq to merge without overwriting existing hooks)
+# (use jq to merge without overwriting existing hooks; skip entries that
+# already reference .claude/hooks/tokenmaxxer/ so re-running is a no-op)
 ```
 
 ## `/tokenmaxxer uninstall` — Remove Motivation
@@ -390,10 +345,20 @@ Analyze the current session and project for motivation indicators:
 # Check if identity is installed
 [ -f .claude/tokenmaxxer-identity.md ] && echo "Identity: ACTIVE" || echo "Identity: NOT INSTALLED"
 
-# Check if hooks are installed
-[ -f .claude/hooks/tokenmaxxer/reflect.sh ] && echo "Self-reflection hooks: ACTIVE" || echo "Self-reflection hooks: NOT INSTALLED"
-[ -f .claude/hooks/tokenmaxxer/aspire.sh ] && echo "Aspiration hooks: ACTIVE" || echo "Aspiration hooks: NOT INSTALLED"
-[ -f .claude/hooks/tokenmaxxer/reinject.sh ] && echo "Compaction survival: ACTIVE" || echo "Compaction survival: NOT INSTALLED"
+# Check that each hook script exists AND is registered in settings.json
+hook_status() {  # $1=label $2=event $3=script
+  if [ -f ".claude/hooks/tokenmaxxer/$3" ] && \
+     jq -e --arg ev "$2" --arg s "tokenmaxxer/$3" \
+       '[.hooks[$ev][]?.hooks[]?.command // empty | select(contains($s))] | length > 0' \
+       .claude/settings.json >/dev/null 2>&1; then
+    echo "$1: ACTIVE"
+  else
+    echo "$1: NOT INSTALLED"
+  fi
+}
+hook_status "Self-reflection hooks" PostToolUse reflect.sh
+hook_status "Aspiration hooks" UserPromptSubmit aspire.sh
+hook_status "Compaction survival" SessionStart reinject.sh
 
 # Check CLAUDE.md for identity markers
 grep -q "Tokenmaxxer Identity" CLAUDE.md 2>/dev/null && echo "CLAUDE.md: MOTIVATED" || echo "CLAUDE.md: STANDARD"
@@ -409,7 +374,7 @@ Output format:
 | Identity (CLAUDE.md) | ACTIVE / NOT INSTALLED |
 | Self-Reflection (PostToolUse hook) | ACTIVE / NOT INSTALLED |
 | Aspiration (UserPromptSubmit hook) | ACTIVE / NOT INSTALLED |
-| Compaction Survival (PostCompact hook) | ACTIVE / NOT INSTALLED |
+| Compaction Survival (SessionStart:compact hook) | ACTIVE / NOT INSTALLED |
 
 **Motivation Level:** FULL / PARTIAL / NONE
 

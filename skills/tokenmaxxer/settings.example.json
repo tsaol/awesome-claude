@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/tokenmaxxer/reflect.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tokenmaxxer/reflect.sh",
             "timeout": 5
           }
         ]
@@ -17,18 +17,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/tokenmaxxer/aspire.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tokenmaxxer/aspire.sh",
             "timeout": 5
           }
         ]
       }
     ],
-    "PostCompact": [
+    "SessionStart": [
       {
+        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/tokenmaxxer/reinject.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tokenmaxxer/reinject.sh",
             "timeout": 5
           }
         ]
