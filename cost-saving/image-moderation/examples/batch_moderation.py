@@ -5,6 +5,8 @@ from pathlib import Path
 
 from image_moderation import ImageModerationPipeline
 
+POLL_INTERVAL_S = 60
+
 pipeline = ImageModerationPipeline(
     enable_cache=True,
     max_image_size=768,
@@ -12,18 +14,23 @@ pipeline = ImageModerationPipeline(
 )
 
 image_dir = Path("images")
-image_paths = list(image_dir.glob("*.jpg")) + list(image_dir.glob("*.png"))
+image_paths = sorted(image_dir.glob("*.jpg")) + sorted(image_dir.glob("*.png"))
 print(f"Submitting {len(image_paths)} images for batch moderation...")
 
 batch_id = pipeline.moderate_batch_async(image_paths)
 print(f"Batch submitted: {batch_id}")
-print("Batch API processes within 24h at 50% cost. Poll for results:")
+print("Batch API processes within 24h at 50% cost. Polling for completion...")
 
-# In production, poll periodically instead of sleeping
-time.sleep(60)
+while (status := pipeline.get_batch_status(batch_id)) != "ended":
+    print(f"  status: {status}; checking again in {POLL_INTERVAL_S}s")
+    time.sleep(POLL_INTERVAL_S)
+
 results = pipeline.get_batch_results(batch_id)
 
+# custom_id "img_<i>" maps back to image_paths[i]
 flagged = [r for r in results if not r.safe]
 print(f"\nResults: {len(results)} processed, {len(flagged)} flagged")
 for r in flagged:
-    print(f"  - {r.category.value} (confidence: {r.confidence:.2f})")
+    idx = int(r.details["custom_id"].rsplit("_", 1)[1])
+    label = "NEEDS REVIEW" if r.needs_review else r.category.value
+    print(f"  - {image_paths[idx]}: {label} (confidence: {r.confidence:.2f})")

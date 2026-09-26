@@ -1,14 +1,14 @@
 [build-system]
 requires = ["setuptools>=68.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "image-moderation"
 version = "0.1.0"
 description = "Cost-optimized image content moderation using Claude"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
-    "anthropic>=0.40.0",
+    "anthropic>=0.49.0",
     "Pillow>=10.0.0",
     "imagehash>=4.3.0",
 ]
@@ -16,6 +16,9 @@ dependencies = [
 [project.optional-dependencies]
 ml = ["onnxruntime>=1.16.0", "numpy>=1.24.0"]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.21"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
 where = ["."]
