@@ -1,16 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*)",
       "Bash(wc:*)",
       "Bash(tmux ls:*)",
-      "Bash(aws s3:*)",
-      "Bash(aws ec2:*)",
-      "Bash(aws elbv2:*)",
-      "Bash(aws autoscaling:*)",
+      "Bash(aws s3 ls:*)",
+      "Bash(aws ec2 describe-*:*)",
+      "Bash(aws elbv2 describe-*:*)",
+      "Bash(aws autoscaling describe-*:*)",
       "Bash(aws iam list-*:*)",
       "Bash(aws iam get-*:*)",
-      "Bash(aws sts get-*:*)",
+      "Bash(aws sts get-caller-identity:*)",
       "Bash(aws configure list:*)",
       "Bash(aws logs describe-*:*)",
       "Bash(aws logs get-*:*)",
@@ -23,10 +22,8 @@
       "Bash(aws cloudwatch list-*:*)",
       "Bash(aws pricing get-*:*)",
       "Bash(aws ssm describe-*:*)",
-      "Bash(aws ssm get-*:*)",
       "Bash(aws ssm list-*:*)",
       "Skill(update-config)",
-      "Bash(pip install:*)",
       "Bash(tmux rename-session:*)",
       "WebFetch(domain:aws.amazon.com)"
     ]

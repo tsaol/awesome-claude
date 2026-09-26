@@ -2,3 +2,5 @@
 .DS_Store
 prompts/frontend-generation/reference/
 claudecode/proxy-detector/__pycache__/
+claudecode/proxy-detector/detection_report.json
+claudecode/proxy-detector/monitor_report.json
