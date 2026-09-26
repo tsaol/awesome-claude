@@ -1,43 +1,66 @@
 name: Security
 
+# Template: copy to <repo>/.github/workflows/.
+
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Space-separated list of requirements files to audit with pip-audit, relative
+  # to the repo root. Files that do not exist are skipped with a notice.
+  REQUIREMENTS_FILES: "requirements.txt"
 
 jobs:
   secrets-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Gitleaks scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Organization-owned repos additionally need GITLEAKS_LICENSE:
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   dependency-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
 
       - name: Install pip-audit
         run: pip install pip-audit
 
-      - name: Check ai dependencies
+      - name: Audit Python dependencies
+        # Audits the declared requirements (not the runner's own environment).
         run: |
-          pip install -r ai/requirements.txt || true
-          pip-audit || true
-
-      - name: Check ecom dependencies
-        run: |
-          pip install -r ecom/requirements.txt || true
-          pip-audit || true
+          found=0
+          for req in $REQUIREMENTS_FILES; do
+            if [ -f "$req" ]; then
+              found=1
+              echo "=== pip-audit -r $req ==="
+              pip-audit -r "$req"
+            else
+              echo "::notice::$req not found, skipping"
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::notice::No requirements files found; nothing to audit"
+          fi

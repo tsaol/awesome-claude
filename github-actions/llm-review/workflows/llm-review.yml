@@ -1,77 +1,125 @@
 name: LLM Code Review
 
+# Template: copy to <repo>/.github/workflows/ and scripts/llm_review.py to
+# <repo>/.github/scripts/llm_review.py.
+#
+# Security model:
+# - The review script is always taken from the PR's *base* commit (checked out
+#   into ./trusted), never from the PR head, so a PR cannot modify the script to
+#   exfiltrate LITELLM_API_KEY. Changes to .github/scripts/llm_review.py only take
+#   effect after they are merged.
+# - The PR head is checked out into ./pr only to compute the diff; nothing from it
+#   is executed.
+# - Fork PRs are skipped: GitHub does not expose repository secrets to
+#   `pull_request` runs from forks, so the review could not run anyway.
+
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: llm-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   review:
+    # Skip fork PRs (no access to secrets). See note above.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out trusted review script (base commit)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Check out PR head (diff only, never executed)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install openai
+        run: pip install 'openai>=3.19,<4'
 
       - name: Get PR diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # fetch-depth: 0 fetches all branches, so the base commit is available locally.
+        # --no-ext-diff/--no-textconv: never run diff drivers while reading untrusted content.
         run: |
-          git fetch origin main
-          git diff origin/main...HEAD > pr_diff.txt
+          git -C pr diff --no-ext-diff --no-textconv "$BASE_SHA...$HEAD_SHA" > pr_diff.txt
           echo "=== PR Diff Preview (first 100 lines) ==="
           head -100 pr_diff.txt
 
       - name: LLM Review via LiteLLM
+        id: review
         env:
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
-          LITELLM_MODEL: ${{ secrets.LITELLM_MODEL || 'qwen3-coder-480b' }}
+          LITELLM_MODEL: ${{ secrets.LITELLM_MODEL }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
-        run: python .github/scripts/llm_review.py
+          PR_DIFF_FILE: pr_diff.txt
+          REVIEW_OUTPUT_FILE: review_result.md
+        run: python trusted/.github/scripts/llm_review.py
 
+      # Runs even if the review step failed: posts either the review or a short
+      # "review could not run" note. The job still ends as failed in that case.
       - name: Post review comment
-        uses: actions/github-script@v7
+        if: ${{ !cancelled() && steps.review.outcome != 'skipped' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const fs = require('fs');
-            const review = fs.readFileSync('review_result.md', 'utf8');
+            const MARKER = '<!-- llm-review-bot -->';
+            if (!fs.existsSync('review_result.md')) {
+              core.warning('review_result.md not found; nothing to post');
+              return;
+            }
+            let review = fs.readFileSync('review_result.md', 'utf8');
+            if (!review.includes(MARKER)) {
+              review = `${MARKER}\n${review}`;
+            }
 
-            // Find existing bot comment
-            const { data: comments } = await github.rest.issues.listComments({
+            // Find this bot's previous comment across all pages.
+            const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
+              per_page: 100,
             });
-
             const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('LLM Code Review')
+              c.user && c.user.type === 'Bot' && (c.body || '').includes(MARKER)
             );
 
             if (botComment) {
-              // Update existing comment
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: botComment.id,
-                body: review
+                body: review,
               });
             } else {
-              // Create new comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: review
+                body: review,
               });
             }
