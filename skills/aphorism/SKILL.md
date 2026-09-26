@@ -70,7 +70,7 @@ Step 1:   创建目录 articles/YYYYMMDD-HHMMSS-aphorism/
 Step 1.5: fetch_s3_weekly.py (不足 5 篇则 WebSearch) → process/weekly_news.md
 Step 1.6: aphorism-distiller(Opus)            → process/weekly_insights.md (5-8 条洞察+事件锚点)
 Step 2:   aphorism-gen x3 并行 (Opus/Kimi/DeepSeek) → raw/candidates.md (24-36 条)
-Step 3:   aphorism-critic(Opus, 两批并行)      → process/critique.md (PASS/REFINE/KILL)
+Step 3:   aphorism-critic(Opus, 按模型三批并行) → process/critique.md (PASS/REFINE/KILL)
 Step 4:   aphorism-refiner(Opus)              → output/v1_draft.md
 Step 5:   toutiao-deai(Opus)                  → output/v3_final.md
 Step 6:   展示给用户 → 用户选择 → publish_micro_post
