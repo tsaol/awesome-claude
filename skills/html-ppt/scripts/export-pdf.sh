@@ -83,8 +83,9 @@ else
 fi
 
 # Resolve output to absolute path
-OUTPUT_DIR=$(dirname "$OUTPUT_PDF")
-mkdir -p "$OUTPUT_DIR"
+mkdir -p "$(dirname "$OUTPUT_PDF")"
+# Absolute path: the export runs from a temp dir, so a relative path would land there and be deleted
+OUTPUT_DIR=$(cd "$(dirname "$OUTPUT_PDF")" && pwd)
 OUTPUT_PDF="$OUTPUT_DIR/$(basename "$OUTPUT_PDF")"
 
 echo ""
