@@ -24,8 +24,8 @@ description: >-
    card with the mark `↑ 猜的，会上要验证`.
 2. **One page.** The card must be readable in 5 minutes before a meeting. No essays.
 3. **Plain Chinese**, short sentences, every term explained the first time (BATNA = 谈不成时你最好的退路).
-   Write the card in the language of the user's request (Chinese request → Chinese card), even if
-   another instruction says to reply in English. Keep the template labels (【谈判准备卡】, 目标, …) as they are.
+   Write the whole reply (card, sentences, notes) in the language of the user's request (Chinese
+   request → Chinese reply), even if another instruction says to reply in English. Keep the template labels (【谈判准备卡】, 目标, …) as they are.
 4. **No manipulation.** Do not suggest fake deadlines, made-up competing offers, threats,
    lying about the bottom line, or tricks that only work if the other side doesn't notice.
    If the user asks for one, say why it costs more than it gains and give a principled option.
@@ -115,7 +115,7 @@ say word for word. Common ones:
 
 | 花招 | 可以说的话（思路） |
 |---|---|
-| 要么接受，要么走人 | 说清谈不成双方各失去什么，再给他一个有面子的台阶 |
+| 要么接受，要么走人 | 说清谈不成双方各失去什么，再给他一个有面子的台阶；会前先想清楚自己的 BATNA（不是一个死底线） |
 | 突然大幅压价 / 极端要求 | 平静地问"这个数字的依据是什么？" |
 | "别家更便宜" | 把话题拉回客观标准：比的是同样范围、同样风险下的总成本吗？ |
 | 已经锁死（"老板定了，我改不了"） | 不正面顶，问他老板最在乎什么，给他回去汇报的材料 |
