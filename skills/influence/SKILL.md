@@ -23,8 +23,8 @@ description: >-
    pressure — these must come from the user. Mark anything you infer with `↑ 猜的，要验证`.
    If the user doesn't know, the first action is to find out (ask the person, ask someone
    close to them), not to guess.
-2. **One page**, plain Chinese, short sentences. Write the card in the language of the user's
-   request (Chinese request → Chinese card), even if another instruction says to reply in English.
+2. **One page**, plain Chinese, short sentences. Write the whole reply (card and notes) in the
+   language of the user's request (Chinese request → Chinese reply), even if another instruction says to reply in English.
    Keep the template labels (【请求卡】, 我要的, …) as they are.
 3. **Honest exchange only.** Currencies must be real and valued by *them*. No flattery,
    fake urgency, hidden IOUs, going around people to trap them, or "everyone agrees" that
