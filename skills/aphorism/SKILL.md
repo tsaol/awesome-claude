@@ -1,6 +1,6 @@
 ---
 name: aphorism
-description: Aphorism (金句/随想) micro-post pipeline for Toutiao. Distills this week's news (whatsnew daily reports in S3) into structural insights, generates candidates with 3 models in parallel (Opus 5.5, Kimi K3, DeepSeek V3.2), then critic, refiner, de-AI, and publishes micro-posts only after user confirmation. Requires the external toutiao repo (TOUTIAO_DIR).
+description: Aphorism (金句/随想) micro-post pipeline for Toutiao. Distills this week's news (whatsnew daily reports in S3) into structural insights, generates candidates with 3 models in parallel (Opus 5.5, Kimi K3, DeepSeek V3.2), then critic, refiner, de-AI, and publishes micro-posts only after user confirmation. `--direct` skips the review steps: 4 models (Opus 5.5, GPT-6 Astra, Grok 4.6, Kimi K3) imitate the seed author and the user picks. Requires the external toutiao repo (TOUTIAO_DIR).
 ---
 
 # Aphorism - 金句/随想微头条
@@ -17,6 +17,7 @@ description: Aphorism (金句/随想) micro-post pipeline for Toutiao. Distills 
 ```
 /aphorism                  # 通用视角
 /aphorism --sa             # AI 时代解决方案架构师视角（Step 2-SA）
+/aphorism --direct         # 直接模仿模式：4 个模型扮演作者各写 10 条，用户挑选
 /aphorism --no-publish     # 只生成，不发布
 ```
 
@@ -61,6 +62,7 @@ $TOUTIAO_DIR/PROMPT-aphorism.md
 - **日志**：`scripts/log.py` 收到相对路径时会拼到 `~/codes/toutiao/articles`，所以必须传绝对路径：`"$PY" scripts/log.py "$TOUTIAO_DIR/$ARTICLE_DIR" <step> <status> "<message>"`。
 - **S3 日报不足 5 篇时（Step 1.5）**：按 PROMPT 改用 WebSearch 搜集最近 7 天 10-20 条热点新闻（科技、AI、商业、社会各覆盖一些），每条写标题、日期、来源链接和 2-3 句摘要，存到 `process/weekly_news.md`，然后照常执行 Step 1.6。在 `pipeline.log` 记录 `⚠ S3 日报不足，已改用 WebSearch`。
 - **`--sa`**：用 Step 2-SA 替代 Step 2。
+- **`--direct`**：按 PROMPT 的「直接模仿模式」执行。目录名用 `YYYYMMDD-HHMMSS-aphorism-direct`，Step 1.5 之后直接跑 `"$PY" scripts/aphorism_direct.py --article-dir "$TOUTIAO_DIR/$ARTICLE_DIR"`，跳过 distiller/critic/refiner/deai。把 `raw/direct_all.md` 的全部候选用表格展示给用户（模型、句子、对应新闻、链接），给出推荐，由用户挑选后写入 `output/v3_final.md`。需要 Bedrock 上 GPT-6 Astra (`us.openai.gpt-6-astra`) 和 Grok 4.6 (`us.xai.grok-4.6`) 的权限。
 - **某个模型调用失败**：按 PROMPT 规定用剩余模型继续，并记录日志。
 
 ### 流程概览
